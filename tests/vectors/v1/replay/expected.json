@@ -1,0 +1,7 @@
+{
+  "result": "ACCEPTED_THEN_REPLAYED",
+  "layout": "C2",
+  "mask": 5,
+  "envelopeBytes": 195,
+  "visualBits": 4080
+}

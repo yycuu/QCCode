@@ -1,0 +1,19 @@
+{
+  "name": "@circlecode/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": { "build": "tsc -b" }
+  ,"dependencies": {
+    "@circlecode/decoder": "workspace:*",
+    "@circlecode/encoder": "workspace:*",
+    "@circlecode/protocol": "workspace:*",
+    "@circlecode/renderer-canvas": "workspace:*",
+    "@circlecode/renderer-svg": "workspace:*",
+    "@circlecode/scanner": "workspace:*",
+    "@circlecode/security": "workspace:*"
+  }
+}

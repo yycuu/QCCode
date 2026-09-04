@@ -1,0 +1,21 @@
+{
+  "name": "circlecode",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.21.0",
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "pnpm build && pnpm --filter @circlecode/demo dev",
+    "server": "pnpm build && pnpm --filter @circlecode/reference-server dev",
+    "vectors": "tsx scripts/generate-vectors.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

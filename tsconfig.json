@@ -1,0 +1,19 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/protocol" },
+    { "path": "packages/security" },
+    { "path": "packages/core" },
+    { "path": "packages/geometry" },
+    { "path": "packages/encoder" },
+    { "path": "packages/decoder" },
+    { "path": "packages/renderer-svg" },
+    { "path": "packages/renderer-canvas" },
+    { "path": "packages/vision" },
+    { "path": "packages/scanner" },
+    { "path": "packages/server-sdk" },
+    { "path": "packages/sdk" },
+    { "path": "apps/reference-server" },
+    { "path": "apps/demo" }
+  ]
+}

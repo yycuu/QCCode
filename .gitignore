@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+coverage/
+.env
+*.pem
+*.key
+private-keys/
+tests/vectors/v1/generated/
+.playwright-cli/
+output/

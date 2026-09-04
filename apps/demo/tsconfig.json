@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "outDir": "dist", "rootDir": "src", "lib": ["ES2022", "DOM"] },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../../packages/encoder" }, { "path": "../../packages/protocol" }, { "path": "../../packages/renderer-svg" }, { "path": "../../packages/renderer-canvas" }, { "path": "../../packages/scanner" }, { "path": "../../packages/security" }]
+}

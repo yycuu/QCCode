@@ -1,0 +1,12 @@
+{
+  "mode": "INLINE",
+  "flags": 4,
+  "issuerIdHex": "00112233445566778899aabbccddeeff",
+  "keyId": 27,
+  "messageType": 1001,
+  "messageIdHex": "102132435465768798a9bacbdcedfe0f",
+  "issuedAt": "1700000000",
+  "expiresAt": "1700000300",
+  "nonceHex": "ffeeddccbbaa99887766554433221100",
+  "payloadHex": "7369676e6174757265"
+}

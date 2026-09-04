@@ -1,0 +1,16 @@
+{
+  "name": "@circlecode/reference-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "tsx src/index.ts", "start": "node dist/index.js", "build": "tsc -b" },
+  "dependencies": {
+    "@circlecode/protocol": "workspace:*",
+    "@circlecode/security": "workspace:*",
+    "@circlecode/server-sdk": "workspace:*",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": { "@types/cors": "^2.8.19", "@types/express": "^5.0.3", "@types/ws": "^8.18.1" }
+}

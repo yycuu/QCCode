@@ -1,0 +1,16 @@
+{
+  "name": "@circlecode/demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "vite", "build": "vite build" },
+  "dependencies": {
+    "@circlecode/encoder": "workspace:*",
+    "@circlecode/protocol": "workspace:*",
+    "@circlecode/renderer-canvas": "workspace:*",
+    "@circlecode/renderer-svg": "workspace:*",
+    "@circlecode/scanner": "workspace:*",
+    "@circlecode/security": "workspace:*"
+  },
+  "devDependencies": { "vite": "^7.1.3" }
+}
