@@ -48,7 +48,7 @@ Server
 
 ## 2. 仓库与包
 
-当前项目是 pnpm TypeScript monorepo，各包尚未发布到公共 npm registry。仓库内部通过 `workspace:*` 引用。
+当前项目是 pnpm TypeScript monorepo。`@qccode/*` 0.1.0 已发布到公共 npm registry；仓库中的生产集成接口版本为 0.2.0。仓库内部通过 `workspace:*` 引用。
 
 | 包 | 用途 |
 |---|---|
@@ -90,7 +90,7 @@ Demo:             http://127.0.0.1:5173
 Reference Server: http://localhost:8787
 ```
 
-如果要把包接入其他仓库，应先建立内部 package publishing 流程，或把需要的包加入目标 pnpm workspace。不要从 `src/` 深层路径导入内部实现。
+从 npm 集成时，业务服务只安装 `@qccode/server-sdk`，浏览器应用只安装 `@qccode/sdk`。不要从 `src/` 深层路径导入内部实现。
 
 ## 3. 模式选择
 

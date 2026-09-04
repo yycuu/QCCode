@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const releaseTag = process.env.GITHUB_REF_NAME;
+const releaseTag = process.env.RELEASE_TAG ?? process.env.GITHUB_REF_NAME;
 if (!releaseTag) throw new Error("Release tag is unavailable.");
 
 const directories = [

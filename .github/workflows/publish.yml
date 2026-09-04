@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to publish, for example v0.2.0"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -11,26 +17,33 @@ permissions:
 
 jobs:
   publish:
-    name: Publish ${{ github.ref_name }}
+    name: Publish ${{ inputs.tag || github.ref_name }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
-
-      - name: Set up pnpm and Node.js
-        uses: pnpm/setup@v2
         with:
-          runtime: node@24
-          cache: false
-          install: false
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Verify release versions
         run: node scripts/verify-release-version.mjs
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
       - name: Run tests
         run: pnpm test

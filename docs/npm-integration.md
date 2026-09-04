@@ -19,7 +19,7 @@
 @qccode/core
 ```
 
-`@qccode/*` 0.1.0 已发布到公共 npm registry；本文档对应正在发布的生产版 0.2.0。npm 账号必须拥有 `qccode` scope 才能发布新版本。
+`@qccode/*` 0.1.0 已发布到公共 npm registry；本文档及仓库源码对应生产版 0.2.0。发布完成前，外部项目安装到的最新版仍为 0.1.0。npm 账号必须拥有 `qccode` scope 才能发布新版本。
 
 ## 浏览器应用安装
 
@@ -240,7 +240,7 @@ pnpm release:npm
 
 仓库提供 `.github/workflows/publish.yml`。推送完整 SemVer tag 时它会自动运行，并要求 tag 为 `v<version>`，例如 `v0.2.0`。`v1` 这类缩写不会触发发布。
 
-首次发布各包后，在 npmjs.com 的每个 `@qccode/*` package 设置中添加 Trusted Publisher：
+在 npmjs.com 的每个 `@qccode/*` package 页面打开 **Settings → Trusted Publisher**，分别添加：
 
 ```text
 Provider:          GitHub Actions
@@ -251,6 +251,10 @@ Allowed action:    npm publish
 ```
 
 全部 12 个 package 都需要配置，因为 npm 对每个 package 单独维护发布信任关系。工作流使用 `id-token: write` 获取短期 OIDC 身份，不需要保存长期 `NPM_TOKEN`。
+
+这些字段区分大小写。`Workflow filename` 只填 `publish.yml`，不要填 `.github/workflows/publish.yml`；不要填写 Environment，因为当前 workflow 没有使用 GitHub Environment。Node.js 24 和 npm 11 满足 Trusted Publishing 对 Node.js 22.14+、npm 11.5.1+ 的要求。OIDC 发布会自动生成 provenance，无需额外添加 `--provenance`，仓库也不应配置 `NPM_TOKEN`。
+
+如果 tag 触发的任务在 `Publish packages` 步骤失败，先检查失败时打印的第一个包，并确认该包也配置了上述 Trusted Publisher。完成设置后，无需修改版本或重建 tag：进入 GitHub 仓库的 **Actions → Publish npm packages → Run workflow**，输入已有 tag（例如 `v0.2.0`）即可重试。发布脚本会查询 npm registry 并跳过已经发布成功的同版本包，因此可以安全重跑。
 
 后续发布流程：
 
@@ -269,5 +273,9 @@ Allowed action:    npm publish
 `ERR_PNPM_WORKSPACE_PKG_NOT_FOUND`：正在安装仓库源码但没有从 monorepo 根目录运行 `pnpm install`。
 
 `Unsupported URL Type "workspace:"`：直接对源码目录执行了 `npm publish`。使用仓库的 `pnpm release:npm`，它会先生成已把 `workspace:*` 转换成正式版本依赖的 tarball。
+
+`ENEEDAUTH` 或 `Unable to authenticate`：Trusted Publisher 的用户、仓库、workflow 文件名或 Allowed action 与当前 workflow 不一致，或者只有部分 package 配置了信任关系。逐包核对 `yycuu`、`QCCode`、`publish.yml` 和 `npm publish`。
+
+`Automatic provenance generation not supported for provider: null`：在本机执行了带 provenance 的发布。自动 provenance 只在受支持的云端 CI OIDC 环境生效；本项目的正式发布应通过 GitHub Actions 进行。
 
 浏览器提示 `crypto.subtle`、Camera 或 Canvas 不可用：确认运行于受支持的现代浏览器和 HTTPS 安全上下文；Node.js 服务端不要导入 Scanner 或 Canvas 模块。
