@@ -68,7 +68,21 @@ export function decodeImageData(image: ImageData): VisionDecodeResult {
   const outer = 87 / 113;
   const radialPitch = (outer - inner) / bootstrap.layout.ringSlots.length;
   const samples = bootstrap.layout.ringSlots.map((count, ring) => Array.from({ length: count }, (_, slot) => sampleGray(inner + (ring + 0.5) * radialPitch, best.phase + direction * (slot + 0.5) * Math.PI * 2 / count)));
-  let centers = [245, 185, 105, 15];
+  const unique = [...new Set(samples.flat())].sort((a, b) => a - b);
+  let centers: number[] = [];
+  if (unique.length > 0) centers.push(unique[unique.length - 1]!);
+  while (centers.length < 4) {
+    let candidate = -1;
+    let bestDistance = -1;
+    for (const value of unique) {
+      let nearest = Number.POSITIVE_INFINITY;
+      for (const center of centers) nearest = Math.min(nearest, Math.abs(value - center));
+      if (nearest > bestDistance) { bestDistance = nearest; candidate = value; }
+    }
+    if (candidate < 0 || bestDistance <= 0) break;
+    centers.push(candidate);
+  }
+  while (centers.length < 4) centers.push(unique[0] ?? 0);
   for (let iteration = 0; iteration < 12; iteration++) {
     const groups = centers.map(() => [] as number[]);
     for (const value of samples.flat()) {

@@ -25,23 +25,23 @@ function drawRing(ctx: CanvasRenderingContext2D, bits: ArrayLike<number>, inner:
   }
 }
 
-function drawRadialMarkers(ctx: CanvasRenderingContext2D, bits: ArrayLike<number>, inner: number, outer: number, levels: readonly [string, string, string, string]): void {
-  const radius = (inner + outer) / 2;
-  const radialSize = (outer - inner) * 0.90;
+function drawDataArcBlocks(ctx: CanvasRenderingContext2D, bits: ArrayLike<number>, inner: number, outer: number, levels: readonly [string, string, string, string]): void {
   const pitch = Math.PI * 2 / bits.length;
-  const tangentialSize = radius * pitch * 0.72;
   for (let slot = 0; slot < bits.length; slot++) {
     const value = bits[slot]!;
     if (value === 0) continue;
-    const angle = -Math.PI / 2 + (slot + 0.5) * pitch;
-    ctx.save();
-    ctx.translate(128 + radius * Math.cos(angle), 128 + radius * Math.sin(angle));
-    ctx.rotate(angle);
+    const start = -Math.PI / 2 + (slot + 0.03) * pitch;
+    const end = -Math.PI / 2 + (slot + 0.97) * pitch;
     ctx.beginPath();
-    ctx.ellipse(0, 0, radialSize / 2, tangentialSize / 2, 0, 0, Math.PI * 2);
+    ctx.arc(128, 128, outer, start, end);
+    ctx.arc(128, 128, inner, end, start, true);
+    ctx.closePath();
     ctx.fillStyle = levels[value]!;
     ctx.fill();
-    ctx.restore();
+    ctx.lineWidth = 0.3;
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = ctx.fillStyle;
+    ctx.stroke();
   }
 }
 
@@ -50,7 +50,7 @@ export function renderCanvas(symbol: QCCodeSymbol, canvas: HTMLCanvasElement | O
   const foreground = options.foreground ?? "#000000";
   const background = options.background ?? "#FFFFFF";
   const dataBackground = options.dataBackground ?? "#F1F3F2";
-  const levels = options.levels ?? [dataBackground, "#79A987", "#356147", foreground] as const;
+  const levels = options.levels ?? [dataBackground, "#C6CCC8", "#737A76", foreground] as const;
   canvas.width = size;
   canvas.height = size;
   const context = canvas.getContext("2d");
@@ -74,7 +74,7 @@ export function renderCanvas(symbol: QCCodeSymbol, canvas: HTMLCanvasElement | O
   drawRing(ctx, symbol.bootstrap, 89, 95, undefined, "#DCE3DE");
   const inner = symbol.layout.centerRadius * 113;
   const pitch = (87 - inner) / symbol.dataRings.length;
-  symbol.dataRings.forEach((bits, ring) => drawRadialMarkers(ctx, bits, inner + ring * pitch + pitch * 0.09, inner + (ring + 1) * pitch - pitch * 0.09, levels));
+  symbol.dataRings.forEach((bits, ring) => drawDataArcBlocks(ctx, bits, inner + ring * pitch + 0.17, inner + (ring + 1) * pitch - 0.17, levels));
   const center = options.center ?? { mode: "none" };
   if (center.mode === "logo") {
     const diameter = inner * 2 * Math.min(center.scale ?? 0.82, 0.82);
