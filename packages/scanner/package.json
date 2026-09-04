@@ -1,6 +1,6 @@
 {
   "name": "@qccode/scanner",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Browser image, canvas, video, and camera scanner for QCCode.",
   "type": "module",
   "main": "./dist/index.js",

@@ -48,7 +48,7 @@ Server
 
 ## 2. 仓库与包
 
-当前项目是 pnpm TypeScript monorepo。`@qccode/*` 0.1.0 已发布到公共 npm registry；仓库中的生产集成接口版本为 0.2.0。仓库内部通过 `workspace:*` 引用。
+当前项目是 pnpm TypeScript monorepo。`@qccode/*` 0.1.0 与 0.2.0 已发布到公共 npm registry；仓库中的生产集成接口版本为 0.3.0。仓库内部通过 `workspace:*` 引用。
 
 | 包 | 用途 |
 |---|---|

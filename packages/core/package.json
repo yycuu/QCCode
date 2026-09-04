@@ -1,6 +1,6 @@
 {
   "name": "@qccode/core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "CRC-32C, Reed-Solomon, interleaving, bit, and mask primitives for QCCode.",
   "type": "module",
   "main": "./dist/index.js",
