@@ -14,12 +14,6 @@ function point(radius: number, angle: number): [number, number] {
   return [128 + radius * Math.cos(angle), 128 + radius * Math.sin(angle)];
 }
 
-function sector(inner: number, outer: number, start: number, end: number): string {
-  const [x1, y1] = point(outer, start), [x2, y2] = point(outer, end);
-  const [x3, y3] = point(inner, end), [x4, y4] = point(inner, start);
-  return `M${x1.toFixed(3)} ${y1.toFixed(3)}A${outer.toFixed(3)} ${outer.toFixed(3)} 0 0 1 ${x2.toFixed(3)} ${y2.toFixed(3)}L${x3.toFixed(3)} ${y3.toFixed(3)}A${inner.toFixed(3)} ${inner.toFixed(3)} 0 0 0 ${x4.toFixed(3)} ${y4.toFixed(3)}Z`;
-}
-
 function roundedArcPaths(bits: ArrayLike<number>, inner: number, outer: number, includeZero = false): Array<{ d: string; width: number; value: number }> {
   const pitch = Math.PI * 2 / bits.length;
   const radius = (inner + outer) / 2;
@@ -34,16 +28,17 @@ function roundedArcPaths(bits: ArrayLike<number>, inner: number, outer: number, 
   return paths;
 }
 
-function dataArcBlocks(bits: ArrayLike<number>, inner: number, outer: number, levels: readonly string[]): string[] {
+function dataArcBlocks(bits: ArrayLike<number>, inner: number, outer: number, tangential: number, levels: readonly string[]): string[] {
+  const radius = (inner + outer) / 2;
+  const radialSize = outer - inner;
   const pitch = Math.PI * 2 / bits.length;
   const markers: string[] = [];
   for (let slot = 0; slot < bits.length; slot++) {
     const value = bits[slot]!;
     if (value === 0) continue;
-    const start = -Math.PI / 2 + (slot + 0.03) * pitch;
-    const end = -Math.PI / 2 + (slot + 0.97) * pitch;
-    const color = escapeXml(levels[value] ?? levels[3]!);
-    markers.push(`<path d="${sector(inner, outer, start, end)}" fill="${color}" stroke="${color}" stroke-width="0.3" stroke-linejoin="round"/>`);
+    const angle = -Math.PI / 2 + (slot + 0.5) * pitch;
+    const [cx, cy] = point(radius, angle);
+    markers.push(`<ellipse cx="${cx.toFixed(3)}" cy="${cy.toFixed(3)}" rx="${(radialSize / 2).toFixed(3)}" ry="${(tangential / 2).toFixed(3)}" transform="rotate(${(angle * 180 / Math.PI).toFixed(3)} ${cx.toFixed(3)} ${cy.toFixed(3)})" fill="${escapeXml(levels[value] ?? levels[3]!)}"/>`);
   }
   return markers;
 }
@@ -89,10 +84,12 @@ export function renderSvg(symbol: QCCodeSymbol, options: SvgRenderOptions = {}):
   const inner = symbol.layout.centerRadius * 113;
   const outer = 87;
   const pitch = (outer - inner) / symbol.dataRings.length;
+  const outerCount = symbol.dataRings[symbol.dataRings.length - 1]!.length;
+  const tangential = (Math.PI * 2 * (outer - 0.17) / outerCount) * 0.9;
   symbol.dataRings.forEach((bits, ring) => {
     const ringInner = inner + ring * pitch + 0.17;
     const ringOuter = inner + (ring + 1) * pitch - 0.17;
-    paths.push(...dataArcBlocks(bits, ringInner, ringOuter, levels));
+    paths.push(...dataArcBlocks(bits, ringInner, ringOuter, tangential, levels));
   });
   const center = options.center ?? { mode: "none" };
   if (center.mode === "logo") {

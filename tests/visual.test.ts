@@ -49,7 +49,7 @@ describe("visual protocol", () => {
     expect(svg).toContain('stroke-linecap="round"');
     expect(svg).toContain("#C6CCC8");
     expect(svg).toContain("#737A76");
-    expect(svg).not.toContain("<ellipse");
+    expect(svg).toContain("<ellipse");
     const logoSvg = renderSvg(symbol, { center: { mode: "logo", imageHref: "/mark.svg", scale: 0.72 } });
     expect(logoSvg).toContain('<image href="/mark.svg"');
     expect(logoSvg).toContain("#F1F3F2");
