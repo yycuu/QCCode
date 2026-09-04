@@ -19,7 +19,7 @@
 @qccode/core
 ```
 
-`@qccode/sdk` 和 `qccode` 在 2026-09-04 查询 npm registry 时没有公开版本。安装命令只有在首次发布完成后才会生效。发布 `@qccode/*` 前，npm 账号必须拥有 `qccode` scope；通常需要先在 npmjs.com 创建同名 organization，或确认该 scope 已属于你的账号。
+`@qccode/*` 0.1.0 已发布到公共 npm registry；本文档对应正在发布的生产版 0.2.0。npm 账号必须拥有 `qccode` scope 才能发布新版本。
 
 ## 浏览器应用安装
 
@@ -124,18 +124,17 @@ scanner.stopCamera();
 
 ## Node.js 服务端安装
 
-服务端只安装这两个包：
+服务端只安装一个 QCCode 包：
 
 ```bash
-npm install @qccode/server-sdk @qccode/protocol
+npm install @qccode/server-sdk
 ```
 
 初始化：
 
 ```ts
 import { readFile } from "node:fs/promises";
-import { QCCodeServer } from "@qccode/server-sdk";
-import { fromBase64Url } from "@qccode/protocol";
+import { QCCodeServer, fromBase64Url } from "@qccode/server-sdk";
 
 const now = BigInt(Math.floor(Date.now() / 1000));
 
@@ -157,10 +156,10 @@ export const qccode = new QCCodeServer({
 import {
   QCCodeMode,
   encodeReferencePayload,
-} from "@qccode/protocol";
+} from "@qccode/server-sdk";
 
 const resourceId = crypto.getRandomValues(new Uint8Array(16));
-qccode.registerResource(resourceId, { accountId: "account-123" });
+await qccode.putResource(7, resourceId, { accountId: "account-123" });
 
 const issued = await qccode.issue({
   mode: QCCodeMode.REFERENCE,
@@ -174,7 +173,7 @@ const issued = await qccode.issue({
 return issued.envelopeBase64Url;
 ```
 
-生产环境必须替换内存 Resource、Replay 和 Revocation 状态，并在服务端重新验证 Scanner 提交的原始 Envelope。
+生产环境通过 `QCCodeStorage` 接入现有数据库，并在服务端重新验证 Scanner 提交的原始 Envelope。完整实现见[生产集成指南](./production-integration.md)。
 
 ## 只安装细分包
 
@@ -210,7 +209,7 @@ pnpm pack:npm
 artifacts/npm/
 ```
 
-每个 tarball 只包含 `dist/` 和 `package.json`。发布前可以检查内容：
+每个 tarball 只包含运行所需的 `dist/`、`package.json`，主 SDK 还包含 README。发布前可以检查内容：
 
 ```bash
 npm pack --dry-run ./packages/sdk
@@ -239,7 +238,7 @@ pnpm release:npm
 
 ## 配置 GitHub OIDC 自动发布
 
-仓库提供 `.github/workflows/publish.yml`。推送完整 SemVer tag 时它会自动运行，并要求 tag 为 `v<version>`，例如 `v0.1.0`。`v1` 这类缩写不会触发发布。
+仓库提供 `.github/workflows/publish.yml`。推送完整 SemVer tag 时它会自动运行，并要求 tag 为 `v<version>`，例如 `v0.2.0`。`v1` 这类缩写不会触发发布。
 
 首次发布各包后，在 npmjs.com 的每个 `@qccode/*` package 设置中添加 Trusted Publisher：
 
@@ -259,7 +258,7 @@ Allowed action:    npm publish
 2. 运行 `pnpm install` 更新 lockfile。
 3. 执行 `pnpm build && pnpm test && pnpm pack:npm`。
 4. 提交版本变更并推送。
-5. 创建并推送同版本 tag，例如 `git tag v0.1.1 && git push origin v0.1.1`。
+5. 创建并推送同版本 tag，例如 `git tag v0.2.1 && git push origin v0.2.1`。
 6. 等待 `Publish npm packages` workflow 完成。
 7. 可在发布成功后创建对应的 GitHub Release 和 release notes。
 

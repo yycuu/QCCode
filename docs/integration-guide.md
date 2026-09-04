@@ -2,6 +2,8 @@
 
 本文面向需要签发、显示、扫描和兑换 QCCode 的前端、后端及移动 Web 团队。内容对应当前仓库实现，不以早期设计草案中的示例 API 为准。
 
+生产部署请优先阅读[生产环境完整集成指南](./production-integration.md)。服务端只需安装 `@qccode/server-sdk`，客户端只需安装 `@qccode/sdk`。
+
 ## 阅读路线
 
 - 首次评估：阅读[系统边界](#1-系统边界)、[模式选择](#3-模式选择)、[容量](#4-容量)和[当前视觉识别边界](#25-当前视觉识别边界)。
@@ -210,8 +212,7 @@ pnpm server
 
 ```ts
 import { readFile } from "node:fs/promises";
-import { QCCodeServer } from "@qccode/server-sdk";
-import { fromBase64Url } from "@qccode/protocol";
+import { QCCodeServer, fromBase64Url } from "@qccode/server-sdk";
 
 const now = BigInt(Math.floor(Date.now() / 1000));
 
@@ -233,11 +234,11 @@ const qcCode = new QCCodeServer({
 import {
   QCCodeMode,
   encodeReferencePayload,
-} from "@qccode/protocol";
+} from "@qccode/server-sdk";
 
 const resourceId = crypto.getRandomValues(new Uint8Array(16));
 
-qcCode.registerResource(resourceId, {
+await qcCode.putResource(7, resourceId, {
   action: "open-device",
   deviceId: "display-01",
 });
@@ -262,7 +263,7 @@ console.log(issued.envelopeBase64Url);
 import {
   QCCodeMode,
   encodeChallengePayload,
-} from "@qccode/protocol";
+} from "@qccode/server-sdk";
 
 const challengeId = crypto.getRandomValues(new Uint8Array(16));
 const context = new TextEncoder().encode(
@@ -285,7 +286,7 @@ const issued = await qcCode.issue({
 ### 6.4 INLINE
 
 ```ts
-import { QCCodeMode } from "@qccode/protocol";
+import { QCCodeMode } from "@qccode/server-sdk";
 
 const issued = await qcCode.issue({
   mode: QCCodeMode.INLINE,
@@ -818,7 +819,7 @@ async function submit(result: QCCodeScanResult) {
 
 ## 17. Replay Store
 
-`MemoryReplayStore` 只适合单进程 Demo。它会在第一次异步操作前同步占位，因此同一进程内并发兑换只有一次成功，但多个实例之间不共享状态，进程重启也会丢失记录。
+`MemoryQCCodeStorage` 和兼容用的 `MemoryReplayStore` 只适合单进程 Demo。生产环境应实现事务型 `QCCodeStorage`，让资源读取、撤销检查、一次性 claim 和业务操作共享事务；完整适配器见[生产环境指南](./production-integration.md)。
 
 生产表结构示例：
 

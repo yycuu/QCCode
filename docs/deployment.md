@@ -10,7 +10,7 @@ QCCODE_KEY_ID                 unsigned decimal key ID
 PORT                              HTTP port, default 8787
 ```
 
-Private key files, `.env`, `*.pem`, and `*.key` are ignored by Git. Production issue endpoints require application authentication and authorization in front of the reference handlers. Terminate TLS at the service boundary and replace `MemoryReplayStore` with shared durable storage.
+Private key files, `.env`, `*.pem`, and `*.key` are ignored by Git. Production issue endpoints require application authentication and authorization in front of the reference handlers. Terminate TLS at the service boundary and implement `QCCodeStorage` with a shared transactional database. See `docs/production-integration.md`.
 
 Run locally in two terminals:
 

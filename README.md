@@ -10,13 +10,13 @@ The server is the only component that signs messages. Display clients receive an
 npm install @qccode/sdk
 ```
 
-Server applications can install the smaller server entry point:
+Server applications only need the server entry point, which also exports protocol and security APIs:
 
 ```bash
 npm install @qccode/server-sdk
 ```
 
-See the [npm integration guide](docs/npm-integration.md) for browser, server, trust-store, publishing, and release configuration.
+See the [production integration guide](docs/production-integration.md) for transactional storage, KMS signing, key rotation, HTTP endpoints, browser trust, and deployment. The [npm integration guide](docs/npm-integration.md) covers publishing and release configuration.
 
 ## Development
 

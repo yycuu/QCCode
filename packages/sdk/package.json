@@ -1,6 +1,6 @@
 {
   "name": "@qccode/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Browser SDK for encoding, rendering, scanning, and verifying QCCode.",
   "type": "module",
   "main": "./dist/index.js",
@@ -12,7 +12,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "sideEffects": false,
   "engines": {

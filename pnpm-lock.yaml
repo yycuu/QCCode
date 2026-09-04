@@ -48,12 +48,6 @@ importers:
 
   apps/reference-server:
     dependencies:
-      '@qccode/protocol':
-        specifier: workspace:*
-        version: link:../../packages/protocol
-      '@qccode/security':
-        specifier: workspace:*
-        version: link:../../packages/security
       '@qccode/server-sdk':
         specifier: workspace:*
         version: link:../../packages/server-sdk

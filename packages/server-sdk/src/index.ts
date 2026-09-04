@@ -1,134 +1,202 @@
-import {
-  QCCodeFlag,
-  QCCodeMode,
-  fromBase64Url,
-  parseEnvelope,
-  toBase64Url,
-  type EnvelopeUnsignedV1,
-} from "@qccode/protocol";
-import {
-  MemoryTrustStore,
-  issueEnvelope,
-  verifyEnvelopeOffline,
-  type QCCodePublicKeyRecord,
-} from "@qccode/security";
+import { QCCodeFlag, QCCodeMode, attachSignature, decodeReferencePayload, encodeSignedBytes, fromBase64Url, parseEnvelope, toBase64Url, type EnvelopeUnsignedV1, type EnvelopeV1 } from "@qccode/protocol";
+import { MemoryTrustStore, signEd25519, verifyEnvelopeOffline, type QCCodePublicKeyRecord } from "@qccode/security";
 
-export type RedeemStatus = "ACCEPTED" | "REPLAYED" | "EXPIRED" | "REVOKED" | "INVALID" | "SERVER_REJECTED";
+export * from "@qccode/protocol";
+export * from "@qccode/security";
+
+export type RedeemStatus = "ACCEPTED" | "REPLAYED" | "EXPIRED" | "REVOKED" | "NOT_FOUND" | "INVALID" | "SERVER_REJECTED";
+export type RedeemResult = { status: RedeemStatus; result?: unknown };
+export type RedemptionClaim = { issuerId: Uint8Array; messageId: Uint8Array; nonce: Uint8Array; expiresAt: bigint; now: bigint };
 
 export interface ReplayStore {
   redeem<T>(issuerId: Uint8Array, messageId: Uint8Array, nonce: Uint8Array, expiresAt: bigint, operation: () => Promise<T>): Promise<{ status: "accepted"; result: T } | { status: "already-used" | "expired" }>;
 }
 
-function id(bytes: Uint8Array): string {
-  return toBase64Url(bytes);
-}
+const id = (bytes: Uint8Array): string => toBase64Url(bytes);
 
 export class MemoryReplayStore implements ReplayStore {
-  readonly #claims = new Map<string, { nonce: string; expiresAt: bigint; state: "pending" | "complete" }>();
-
+  readonly #claims = new Map<string, { nonce: string; expiresAt: bigint }>();
   async redeem<T>(issuerId: Uint8Array, messageId: Uint8Array, nonce: Uint8Array, expiresAt: bigint, operation: () => Promise<T>): Promise<{ status: "accepted"; result: T } | { status: "already-used" | "expired" }> {
-    const now = BigInt(Math.floor(Date.now() / 1000));
-    if (expiresAt <= now) return { status: "expired" };
+    if (expiresAt <= BigInt(Math.floor(Date.now() / 1000))) return { status: "expired" };
     const key = `${id(issuerId)}:${id(messageId)}`;
     if (this.#claims.has(key)) return { status: "already-used" };
-    // The claim is installed synchronously before the first await, making this atomic
-    // within one JS process. Production adapters use a DB unique constraint or Redis Lua.
-    this.#claims.set(key, { nonce: id(nonce), expiresAt, state: "pending" });
-    try {
-      const result = await operation();
-      this.#claims.set(key, { nonce: id(nonce), expiresAt, state: "complete" });
-      return { status: "accepted", result };
-    } catch (error) {
-      this.#claims.delete(key);
-      throw error;
-    }
+    this.#claims.set(key, { nonce: id(nonce), expiresAt });
+    try { return { status: "accepted", result: await operation() }; }
+    catch (error) { this.#claims.delete(key); throw error; }
   }
 }
 
 export type IssuerConfiguration = {
   issuerId: Uint8Array;
   keyId: number;
-  privateKeyPkcs8: Uint8Array;
+  privateKeyPkcs8?: Uint8Array;
   publicKey: Uint8Array;
   keyNotBefore: bigint;
   keyNotAfter: bigint;
+  sign?: (signedBytes: Uint8Array) => Promise<Uint8Array>;
 };
+
+export interface QCCodeStorage {
+  transaction<T>(operation: (transaction: unknown) => Promise<T>): Promise<T>;
+  claimRedemption(transaction: unknown, claim: RedemptionClaim): Promise<"claimed" | "replayed" | "expired">;
+  completeRedemption?(transaction: unknown, claim: RedemptionClaim, result: unknown): Promise<void>;
+  getResource(transaction: unknown, issuerId: Uint8Array, resourceType: number, resourceId: Uint8Array): Promise<unknown | null>;
+  putResource(transaction: unknown, issuerId: Uint8Array, resourceType: number, resourceId: Uint8Array, value: unknown): Promise<void>;
+  isRevoked(transaction: unknown, issuerId: Uint8Array, messageId: Uint8Array): Promise<boolean>;
+  revoke(transaction: unknown, issuerId: Uint8Array, messageId: Uint8Array, expiresAt?: bigint): Promise<void>;
+}
+
+export type QCCodeStorageAdapter<T> = {
+  transaction<R>(operation: (transaction: T) => Promise<R>): Promise<R>;
+  claimRedemption(transaction: T, claim: RedemptionClaim): Promise<"claimed" | "replayed" | "expired">;
+  completeRedemption?(transaction: T, claim: RedemptionClaim, result: unknown): Promise<void>;
+  getResource(transaction: T, issuerId: Uint8Array, resourceType: number, resourceId: Uint8Array): Promise<unknown | null>;
+  putResource(transaction: T, issuerId: Uint8Array, resourceType: number, resourceId: Uint8Array, value: unknown): Promise<void>;
+  isRevoked(transaction: T, issuerId: Uint8Array, messageId: Uint8Array): Promise<boolean>;
+  revoke(transaction: T, issuerId: Uint8Array, messageId: Uint8Array, expiresAt?: bigint): Promise<void>;
+};
+
+export function createQCCodeStorage<T>(adapter: QCCodeStorageAdapter<T>): QCCodeStorage { return adapter as QCCodeStorage; }
+
+export class MemoryQCCodeStorage implements QCCodeStorage {
+  #resources = new Map<string, unknown>();
+  #revocations = new Set<string>();
+  #claims = new Map<string, { nonce: string; expiresAt: bigint; result?: unknown }>();
+  #tail: Promise<void> = Promise.resolve();
+
+  async transaction<T>(operation: (transaction: unknown) => Promise<T>): Promise<T> {
+    const previous = this.#tail;
+    let release!: () => void;
+    this.#tail = new Promise<void>((resolve) => { release = resolve; });
+    await previous;
+    const snapshot = [new Map(this.#resources), new Set(this.#revocations), new Map(this.#claims)] as const;
+    try { return await operation(undefined); }
+    catch (error) { [this.#resources, this.#revocations, this.#claims] = snapshot; throw error; }
+    finally { release(); }
+  }
+  async claimRedemption(_tx: unknown, claim: RedemptionClaim): Promise<"claimed" | "replayed" | "expired"> {
+    if (claim.expiresAt <= claim.now) return "expired";
+    const key = `${id(claim.issuerId)}:${id(claim.messageId)}`;
+    if (this.#claims.has(key)) return "replayed";
+    this.#claims.set(key, { nonce: id(claim.nonce), expiresAt: claim.expiresAt });
+    return "claimed";
+  }
+  async completeRedemption(_tx: unknown, claim: RedemptionClaim, result: unknown): Promise<void> {
+    const key = `${id(claim.issuerId)}:${id(claim.messageId)}`;
+    const stored = this.#claims.get(key);
+    if (stored) this.#claims.set(key, { ...stored, result });
+  }
+  async getResource(_tx: unknown, issuerId: Uint8Array, type: number, resourceId: Uint8Array): Promise<unknown | null> { return this.#resources.get(`${id(issuerId)}:${type}:${id(resourceId)}`) ?? this.#resources.get(`${id(issuerId)}:-1:${id(resourceId)}`) ?? null; }
+  async putResource(_tx: unknown, issuerId: Uint8Array, type: number, resourceId: Uint8Array, value: unknown): Promise<void> { this.#resources.set(`${id(issuerId)}:${type}:${id(resourceId)}`, value); }
+  async isRevoked(_tx: unknown, issuerId: Uint8Array, messageId: Uint8Array): Promise<boolean> { return this.#revocations.has(`${id(issuerId)}:${id(messageId)}`); }
+  async revoke(_tx: unknown, issuerId: Uint8Array, messageId: Uint8Array): Promise<void> { this.#revocations.add(`${id(issuerId)}:${id(messageId)}`); }
+}
+
+export type QCCodeResolverContext = { envelope: EnvelopeV1; transaction: unknown; resource?: { resourceType: number; resourceId: Uint8Array; value: unknown } };
+export type QCCodeServerPolicy = { maxTTLSeconds: number; maxEnvelopeBytes: number; clockSkewSeconds: bigint; allowedModes?: readonly QCCodeMode[]; allowedMessageTypes?: readonly number[] };
+export type QCCodeServerOptions = {
+  storage?: QCCodeStorage;
+  verificationKeys?: readonly QCCodePublicKeyRecord[];
+  resolver?: (context: QCCodeResolverContext) => Promise<unknown>;
+  clock?: () => bigint;
+  randomBytes?: (length: number) => Uint8Array;
+  policy?: Partial<QCCodeServerPolicy>;
+  onError?: (error: unknown) => void;
+  replayStore?: ReplayStore;
+};
+
+const isReplayStore = (value: ReplayStore | QCCodeServerOptions): value is ReplayStore => typeof (value as ReplayStore).redeem === "function";
 
 export class QCCodeServer {
   readonly trustStore: MemoryTrustStore;
-  readonly #revokedMessages = new Set<string>();
-  readonly #resources = new Map<string, unknown>();
+  readonly storage: QCCodeStorage;
+  readonly replayStore: ReplayStore | undefined;
+  readonly #options: Required<Pick<QCCodeServerOptions, "clock" | "randomBytes">> & QCCodeServerOptions;
+  readonly #policy: QCCodeServerPolicy;
+  readonly #keys: readonly QCCodePublicKeyRecord[];
 
-  constructor(readonly issuer: IssuerConfiguration, readonly replayStore: ReplayStore = new MemoryReplayStore()) {
-    this.trustStore = new MemoryTrustStore([this.keyRecord]);
+  constructor(readonly issuer: IssuerConfiguration, replayStoreOrOptions: ReplayStore | QCCodeServerOptions = {}) {
+    const supplied = isReplayStore(replayStoreOrOptions) ? { replayStore: replayStoreOrOptions } : replayStoreOrOptions;
+    this.#options = { ...supplied, clock: supplied.clock ?? (() => BigInt(Math.floor(Date.now() / 1000))), randomBytes: supplied.randomBytes ?? ((length) => crypto.getRandomValues(new Uint8Array(length))) };
+    this.#policy = { maxTTLSeconds: 86_400, maxEnvelopeBytes: 4096, clockSkewSeconds: 0n, ...supplied.policy };
+    this.storage = supplied.storage ?? new MemoryQCCodeStorage();
+    this.replayStore = supplied.replayStore;
+    this.#keys = [this.keyRecord, ...(supplied.verificationKeys ?? [])];
+    const keyIds = new Set<number>();
+    for (const key of this.#keys) {
+      if (id(key.issuerId) !== id(this.issuer.issuerId)) throw new Error("all verification keys must belong to the configured issuer");
+      if (keyIds.has(key.keyId)) throw new Error(`duplicate verification key ID ${key.keyId}`);
+      keyIds.add(key.keyId);
+    }
+    this.trustStore = new MemoryTrustStore([...this.#keys]);
   }
 
-  get keyRecord(): QCCodePublicKeyRecord {
-    return { issuerId: this.issuer.issuerId, keyId: this.issuer.keyId, publicKey: this.issuer.publicKey, status: "CURRENT", notBefore: this.issuer.keyNotBefore, notAfter: this.issuer.keyNotAfter };
-  }
+  get keyRecord(): QCCodePublicKeyRecord { return { issuerId: this.issuer.issuerId, keyId: this.issuer.keyId, publicKey: this.issuer.publicKey, status: "CURRENT", notBefore: this.issuer.keyNotBefore, notAfter: this.issuer.keyNotAfter }; }
+  get publicKeys(): readonly QCCodePublicKeyRecord[] { return this.#keys.map((key) => ({ ...key, issuerId: key.issuerId.slice(), publicKey: key.publicKey.slice() })); }
 
-  async issue(input: {
-    mode: QCCodeMode;
-    messageType: number;
-    payload: Uint8Array;
-    expiresIn: number;
-    singleUse?: boolean;
-    requireConfirmation?: boolean;
-    now?: bigint;
-  }): Promise<{ envelope: Uint8Array; envelopeBase64Url: string }> {
-    if (!Number.isInteger(input.expiresIn) || input.expiresIn < 1 || input.expiresIn > 86_400) throw new Error("expiresIn must be 1..86400 seconds");
-    const now = input.now ?? BigInt(Math.floor(Date.now() / 1000));
+  async issue(input: { mode: QCCodeMode; messageType: number; payload: Uint8Array; expiresIn: number; singleUse?: boolean; requireConfirmation?: boolean; now?: bigint }): Promise<{ envelope: Uint8Array; envelopeBase64Url: string }> {
+    if (!Number.isInteger(input.expiresIn) || input.expiresIn < 1 || input.expiresIn > this.#policy.maxTTLSeconds) throw new Error(`expiresIn must be 1..${this.#policy.maxTTLSeconds} seconds`);
+    if (this.#policy.allowedModes && !this.#policy.allowedModes.includes(input.mode)) throw new Error("mode is not allowed by server policy");
+    if (this.#policy.allowedMessageTypes && !this.#policy.allowedMessageTypes.includes(input.messageType)) throw new Error("messageType is not allowed by server policy");
+    const now = input.now ?? this.#options.clock();
+    if (now < this.issuer.keyNotBefore || now >= this.issuer.keyNotAfter) throw new Error("current signing key is outside its validity window");
     let flags = input.singleUse || input.mode === QCCodeMode.CHALLENGE ? QCCodeFlag.SINGLE_USE : 0;
     if (input.mode !== QCCodeMode.INLINE) flags |= QCCodeFlag.SERVER_RESOLUTION_REQUIRED;
     if (input.requireConfirmation || input.mode === QCCodeMode.CHALLENGE) flags |= QCCodeFlag.USER_CONFIRMATION_REQUIRED;
-    const unsigned: EnvelopeUnsignedV1 = {
-      mode: input.mode,
-      flags,
-      issuerId: this.issuer.issuerId,
-      keyId: this.issuer.keyId,
-      messageType: input.messageType,
-      messageId: crypto.getRandomValues(new Uint8Array(16)),
-      issuedAt: now,
-      expiresAt: now + BigInt(input.expiresIn),
-      nonce: crypto.getRandomValues(new Uint8Array(16)),
-      payload: input.payload,
-    };
-    const envelope = await issueEnvelope(unsigned, this.issuer.privateKeyPkcs8);
+    const unsigned: EnvelopeUnsignedV1 = { mode: input.mode, flags, issuerId: this.issuer.issuerId, keyId: this.issuer.keyId, messageType: input.messageType, messageId: this.#options.randomBytes(16), issuedAt: now, expiresAt: now + BigInt(input.expiresIn), nonce: this.#options.randomBytes(16), payload: input.payload };
+    const signedBytes = encodeSignedBytes(unsigned);
+    if (!this.issuer.sign && !this.issuer.privateKeyPkcs8) throw new Error("privateKeyPkcs8 or sign callback is required");
+    const signature = this.issuer.sign ? await this.issuer.sign(signedBytes) : await signEd25519(signedBytes, this.issuer.privateKeyPkcs8!);
+    const envelope = attachSignature(signedBytes, signature);
     return { envelope, envelopeBase64Url: toBase64Url(envelope) };
   }
 
-  registerResource(resourceId: Uint8Array, value: unknown): void {
-    this.#resources.set(id(resourceId), value);
-  }
+  async putResource(type: number, resourceId: Uint8Array, value: unknown): Promise<void> { await this.storage.transaction((tx) => this.storage.putResource(tx, this.issuer.issuerId, type, resourceId, value)); }
+  registerResource(resourceId: Uint8Array, value: unknown, type = -1): Promise<void> { return this.putResource(type, resourceId, value); }
+  async revoke(messageId: Uint8Array, expiresAt?: bigint): Promise<void> { await this.storage.transaction((tx) => this.storage.revoke(tx, this.issuer.issuerId, messageId, expiresAt)); }
 
-  revoke(messageId: Uint8Array): void {
-    this.#revokedMessages.add(id(messageId));
-  }
-
-  async redeem(envelopeInput: Uint8Array | string): Promise<{ status: RedeemStatus; result?: unknown }> {
+  async redeem(input: Uint8Array | string): Promise<RedeemResult> {
+    let envelope: EnvelopeV1;
     try {
-      const bytes = typeof envelopeInput === "string" ? fromBase64Url(envelopeInput) : envelopeInput;
-      const now = BigInt(Math.floor(Date.now() / 1000));
-      const verified = await verifyEnvelopeOffline(bytes, this.trustStore, { now, clockSkewSeconds: 0n });
-      if (verified.error === "EXPIRED" || verified.envelope.expiresAt <= now) return { status: "EXPIRED" };
+      const now = this.#options.clock();
+      if (typeof input === "string" && input.length > Math.ceil(this.#policy.maxEnvelopeBytes * 4 / 3) + 4) return { status: "INVALID" };
+      const bytes = typeof input === "string" ? fromBase64Url(input) : input;
+      if (bytes.length > this.#policy.maxEnvelopeBytes) return { status: "INVALID" };
+      const verified = await verifyEnvelopeOffline(bytes, this.trustStore, { now, clockSkewSeconds: this.#policy.clockSkewSeconds });
+      envelope = verified.envelope;
+      if (verified.error === "EXPIRED" || envelope.expiresAt <= now) return { status: "EXPIRED" };
       if (!verified.signatureValid || verified.notYetValid) return { status: "INVALID" };
-      const envelope = verified.envelope;
-      if (this.#revokedMessages.has(id(envelope.messageId))) return { status: "REVOKED" };
-      const operation = async (): Promise<unknown> => {
-        if (envelope.mode === QCCodeMode.REFERENCE) return this.#resources.get(id(envelope.payload.slice(2))) ?? null;
-        return { mode: QCCodeMode[envelope.mode], messageType: envelope.messageType, payload: toBase64Url(envelope.payload) };
-      };
-      if (envelope.flags & QCCodeFlag.SINGLE_USE) {
-        const result = await this.replayStore.redeem(envelope.issuerId, envelope.messageId, envelope.nonce, envelope.expiresAt, operation);
-        return result.status === "accepted" ? { status: "ACCEPTED", result: result.result } : { status: result.status === "expired" ? "EXPIRED" : "REPLAYED" };
+    } catch { return { status: "INVALID" }; }
+
+    const operation = async (): Promise<RedeemResult> => this.storage.transaction(async (tx) => {
+      const now = this.#options.clock();
+      if (envelope.expiresAt <= now) return { status: "EXPIRED" };
+      if (await this.storage.isRevoked(tx, envelope.issuerId, envelope.messageId)) return { status: "REVOKED" };
+      let resource: QCCodeResolverContext["resource"];
+      if (envelope.mode === QCCodeMode.REFERENCE) {
+        const reference = decodeReferencePayload(envelope.payload);
+        const value = await this.storage.getResource(tx, envelope.issuerId, reference.resourceType, reference.resourceId);
+        if (value === null) return { status: "NOT_FOUND" };
+        resource = { ...reference, value };
       }
-      return { status: "ACCEPTED", result: await operation() };
-    } catch {
-      return { status: "INVALID" };
-    }
+      const claim: RedemptionClaim = { issuerId: envelope.issuerId, messageId: envelope.messageId, nonce: envelope.nonce, expiresAt: envelope.expiresAt, now };
+      if (envelope.flags & QCCodeFlag.SINGLE_USE) {
+        const state = await this.storage.claimRedemption(tx, claim);
+        if (state === "expired") return { status: "EXPIRED" };
+        if (state === "replayed") return { status: "REPLAYED" };
+      }
+      const result = this.#options.resolver ? await this.#options.resolver({ envelope, transaction: tx, ...(resource ? { resource } : {}) }) : resource?.value ?? { mode: QCCodeMode[envelope.mode], messageType: envelope.messageType, payload: toBase64Url(envelope.payload) };
+      if (envelope.flags & QCCodeFlag.SINGLE_USE) await this.storage.completeRedemption?.(tx, claim, result);
+      return { status: "ACCEPTED", result };
+    });
+    try {
+      if (this.replayStore && (envelope.flags & QCCodeFlag.SINGLE_USE)) {
+        const replay = await this.replayStore.redeem(envelope.issuerId, envelope.messageId, envelope.nonce, envelope.expiresAt, operation);
+        return replay.status === "accepted" ? replay.result : { status: replay.status === "expired" ? "EXPIRED" : "REPLAYED" };
+      }
+      return await operation();
+    } catch (error) { this.#options.onError?.(error); return { status: "SERVER_REJECTED" }; }
   }
 
-  parse(envelope: string): ReturnType<typeof parseEnvelope> {
-    return parseEnvelope(fromBase64Url(envelope));
-  }
+  parse(envelope: string): ReturnType<typeof parseEnvelope> { return parseEnvelope(fromBase64Url(envelope)); }
 }

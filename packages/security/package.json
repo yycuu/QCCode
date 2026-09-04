@@ -1,6 +1,6 @@
 {
   "name": "@qccode/security",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Ed25519 signing, trust storage, and offline verification for QCCode.",
   "type": "module",
   "main": "./dist/index.js",

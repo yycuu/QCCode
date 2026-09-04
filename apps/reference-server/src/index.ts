@@ -4,14 +4,14 @@ import cors from "cors";
 import express from "express";
 import { WebSocketServer } from "ws";
 import {
+  QCCodeServer,
   QCCodeMode,
   encodeChallengePayload,
   encodeReferencePayload,
   fromBase64Url,
+  generateEd25519KeyPair,
   toBase64Url,
-} from "@qccode/protocol";
-import { generateEd25519KeyPair } from "@qccode/security";
-import { QCCodeServer } from "@qccode/server-sdk";
+} from "@qccode/server-sdk";
 
 async function loadKeys(): Promise<{ privateKeyPkcs8: Uint8Array; publicKey: Uint8Array }> {
   const privatePath = process.env.QCCODE_PRIVATE_KEY_FILE;
@@ -34,8 +34,7 @@ const httpServer = createServer(app);
 const sockets = new WebSocketServer({ server: httpServer, path: "/qccode/v1/ws" });
 
 app.get("/qccode/v1/keys", (_request, response) => {
-  const key = qcCode.keyRecord;
-  response.json({ issuerId: toBase64Url(key.issuerId), keys: [{ kid: key.keyId, algorithm: "Ed25519", publicKey: toBase64Url(key.publicKey), status: key.status, notBefore: Number(key.notBefore), notAfter: Number(key.notAfter) }] });
+  response.json({ issuerId: toBase64Url(qcCode.issuer.issuerId), keys: qcCode.publicKeys.map((key) => ({ kid: key.keyId, algorithm: "Ed25519", publicKey: toBase64Url(key.publicKey), status: key.status, notBefore: Number(key.notBefore), notAfter: Number(key.notAfter) })) });
 });
 
 app.post("/qccode/v1/issue", async (request, response) => {
@@ -46,7 +45,7 @@ app.post("/qccode/v1/issue", async (request, response) => {
     if (mode === QCCodeMode.REFERENCE) {
       const resourceId = crypto.getRandomValues(new Uint8Array(16));
       payload = encodeReferencePayload(Number(request.body.resourceType ?? 1), resourceId);
-      qcCode.registerResource(resourceId, request.body.payload ?? null);
+      await qcCode.putResource(Number(request.body.resourceType ?? 1), resourceId, request.body.payload ?? null);
     } else if (mode === QCCodeMode.CHALLENGE) {
       const challengeId = crypto.getRandomValues(new Uint8Array(16));
       const context = new TextEncoder().encode(JSON.stringify(request.body.payload ?? null));
