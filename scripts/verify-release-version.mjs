@@ -1,18 +1,25 @@
 import { readFile } from "node:fs/promises";
 
-const expected = process.env.GITHUB_REF_NAME?.replace(/^v/u, "");
-if (!expected) throw new Error("Release tag must be named v<version>");
+const releaseTag = process.env.GITHUB_REF_NAME;
+if (!releaseTag) throw new Error("Release tag is unavailable.");
 
 const directories = [
   "core", "geometry", "protocol", "security", "vision", "encoder",
   "decoder", "renderer-canvas", "renderer-svg", "scanner", "server-sdk", "sdk",
 ];
 
-for (const directory of directories) {
-  const manifest = JSON.parse(await readFile(new URL(`../packages/${directory}/package.json`, import.meta.url)));
-  if (manifest.version !== expected) {
-    throw new Error(`${manifest.name} is ${manifest.version}, expected ${expected} from the release tag`);
-  }
+const manifests = await Promise.all(directories.map(async (directory) =>
+  JSON.parse(await readFile(new URL(`../packages/${directory}/package.json`, import.meta.url))),
+));
+const versions = new Set(manifests.map(({ version }) => version));
+if (versions.size !== 1) {
+  throw new Error(`All packages must have one version; found ${[...versions].join(", ")}.`);
 }
 
-console.log(`All QCCode packages match release ${expected}.`);
+const [version] = versions;
+const expectedTag = `v${version}`;
+if (releaseTag !== expectedTag) {
+  throw new Error(`Release tag ${releaseTag} does not match package version ${version}. Create the GitHub Release with tag ${expectedTag}.`);
+}
+
+console.log(`All QCCode packages match release ${releaseTag}.`);

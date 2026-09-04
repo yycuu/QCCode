@@ -34,6 +34,20 @@ function run(command, args, options = {}) {
   return result.stdout;
 }
 
+function isPublished(name, version) {
+  const result = spawnSync("npm", [
+    "view",
+    `${name}@${version}`,
+    "version",
+    "--registry=https://registry.npmjs.org/",
+    "--silent",
+  ], { cwd: root, encoding: "utf8", stdio: "pipe" });
+  if (result.status === 0) return result.stdout.trim() === version;
+  if (result.stderr.includes("E404")) return false;
+  process.stderr.write(result.stderr);
+  throw new Error(`Could not check whether ${name}@${version} is published.`);
+}
+
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
 
@@ -65,6 +79,10 @@ if (versions.size !== 1) {
 
 if (publish) {
   for (const packed of packedPackages) {
+    if (isPublished(packed.name, packed.version)) {
+      console.log(`Already published ${packed.name}@${packed.version}; skipping.`);
+      continue;
+    }
     run("npm", ["publish", packed.filename, "--access", "public"]);
   }
 }
