@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { encodeQCCode } from "../packages/encoder/src/index.js";
-import { QCCodeFlag, QCCodeMode } from "../packages/protocol/src/index.js";
+import { QCCodeFlag, QCCodeMode, encodeBearerEnvelope } from "../packages/protocol/src/index.js";
 import { issueEnvelope, privateKeyFromSeed } from "../packages/security/src/index.js";
 import { decodeImageData } from "../packages/vision/src/index.js";
 
@@ -60,7 +60,8 @@ function rasterizeSymbol(symbol: ReturnType<typeof encodeQCCode>): { width: numb
         const angularPitch = Math.PI * 2 / ringBits.length;
         const slot = Math.floor(angle / angularPitch) % ringBits.length;
         const fraction = (angle - Math.floor(angle / angularPitch) * angularPitch) / angularPitch;
-        if (fraction >= 0.03 && fraction < 0.97) paint(x, y, LEVELS[ringBits[slot]!]!);
+        const inside = symbol.layout.visualVersion === 2 ? fraction >= 0.42 && fraction < 0.58 : fraction >= 0.03 && fraction < 0.97;
+        if (inside) paint(x, y, LEVELS[ringBits[slot]!]!);
         break;
       }
     }
@@ -91,5 +92,26 @@ describe("vision pipeline", () => {
     expect(result.unknownPhysicalSlots).toHaveLength(0);
     expect(result.symbol.dataRings).toEqual(symbol.dataRings);
     expect(result.confidence).toBeGreaterThan(0.95);
+  });
+
+  it("recovers every quaternary level from a rasterized S1 symbol", async () => {
+    const envelope = encodeBearerEnvelope({
+      issuerId: Uint8Array.from({ length: 8 }, (_, index) => index),
+      messageType: 1001,
+      messageId: Uint8Array.from({ length: 12 }, (_, index) => 0x10 + index),
+      issuedAt: 1_700_000_000,
+      expiresAt: 1_700_000_300,
+      resourceType: 7,
+      resourceId: Uint8Array.from({ length: 12 }, (_, index) => 0xa0 + index),
+    });
+    const symbol = encodeQCCode(envelope);
+    expect(symbol.layout.id).toBe("S1");
+
+    const image = rasterizeSymbol(symbol);
+    const result = decodeImageData(image as unknown as ImageData);
+
+    expect(result.unknownPhysicalSlots).toHaveLength(0);
+    expect(result.symbol.dataRings).toEqual(symbol.dataRings);
+    expect(result.symbol.visualVersion).toBe(2);
   });
 });

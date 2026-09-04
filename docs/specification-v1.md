@@ -117,6 +117,14 @@ The center carries no protocol, orientation, or ECC data. `center.mode=none` lea
 
 Each data slot is a radially oriented ellipse filling its radial band, matching the guard ring weight. The tangential size is uniform across all data rings at 90% of the outermost ring's slot pitch, so inner and outer marks share one size. Each slot carries two bits using four ordered luminance states: background `00`, subtle light gray `01`, medium gray `10`, and black `11`. The default palette is `#F1F3F2`, `#C6CCC8`, `#737A76`, and `#000000`; the subtle first level reduces visual clutter while remaining separable by luminance. Custom palettes must remain strictly ordered by relative luminance with at least 0.06 luminance separation between adjacent levels. A decoder classifies levels from calibrated luminance clusters and marks low-confidence samples as erasures. Orientation and Bootstrap remain logically binary; their zero slots may be rendered with the standard pale calibration color `#DCE3DE`, which must remain on the background side of the binary threshold.
 
+## Sparse S1 layout (visual version 2)
+
+S1 renders the data area with the same sparse, guard-weight dash marks as the Orientation and Bootstrap rings. Its Bootstrap uses the version-2 preamble `0b10111` with layout id 1, so V1 decoders reject it cleanly. S1 has six data rings holding `[40, 48, 55, 61, 68, 72]` slots for 344 quaternary slots total, packed into one shortened RS(86,54) codeword: 54 data bytes and 32 parity bytes. The frame is the 48-byte bearer envelope followed by its CRC-32C and two zero padding bytes.
+
+Each slot renders as a rounded-cap arc spanning 16% of its angular pitch with a stroke width equal to its radial band, so the marks match the guard ring weight. Slot pitch stays at or above the mark width, which keeps slot-center sampling unambiguous.
+
+The S1 bearer envelope is exactly 48 bytes: magic `0xc4 0x02`, mode `0x02` (REFERENCE), flags, uint16 message type, 8-byte issuer id, 12-byte message id, uint32 issued-at and expires-at, uint16 resource type, and 12-byte resource id. It carries no signature: 96-bit resource ids are unguessable bearer secrets verified server-side with atomic single-use redemption. V1 signed layouts are unchanged and remain the offline-verifiable format.
+
 ## Server policy
 
 Key lookup uses `(issuerId,keyId)`. New messages use the current key; previous keys may verify messages within their stated lifetime; revoked keys fail. Offline verification is possible only with a cached trusted key.

@@ -67,21 +67,22 @@ function polyEval(poly: ArrayLike<number>, x: number): number {
   return result;
 }
 
-let generator: number[] | undefined;
-function rsGenerator(): number[] {
-  if (generator) return generator;
+const generators = new Map<number, number[]>();
+function rsGenerator(parityBytes: number): number[] {
+  const cached = generators.get(parityBytes);
+  if (cached) return cached;
   let current = [1];
-  for (let index = 0; index < RS_PARITY_BYTES; index++) current = polyMul(current, [1, EXP[index]!]);
-  generator = current;
+  for (let index = 0; index < parityBytes; index++) current = polyMul(current, [1, EXP[index]!]);
+  generators.set(parityBytes, current);
   return current;
 }
 
-export function reedSolomonEncode(data: Uint8Array): Uint8Array {
-  if (data.length !== RS_DATA_BYTES) throw new Error(`RS source must be ${RS_DATA_BYTES} bytes`);
-  const result = new Uint8Array(RS_CODEWORD_BYTES);
+export function reedSolomonEncode(data: Uint8Array, parityBytes: number = RS_PARITY_BYTES): Uint8Array {
+  if (parityBytes < 1 || parityBytes > RS_PARITY_BYTES) throw new Error(`RS parity must be 1..${RS_PARITY_BYTES} bytes`);
+  const result = new Uint8Array(data.length + parityBytes);
   result.set(data);
-  const gen = rsGenerator();
-  for (let index = 0; index < RS_DATA_BYTES; index++) {
+  const gen = rsGenerator(parityBytes);
+  for (let index = 0; index < data.length; index++) {
     const coefficient = result[index]!;
     if (coefficient === 0) continue;
     for (let j = 1; j < gen.length; j++) result[index + j] = result[index + j]! ^ gfMul(gen[j]!, coefficient);
@@ -90,8 +91,8 @@ export function reedSolomonEncode(data: Uint8Array): Uint8Array {
   return result;
 }
 
-function syndromes(codeword: Uint8Array): number[] {
-  return Array.from({ length: RS_PARITY_BYTES }, (_, index) => polyEval(codeword, EXP[index]!));
+function syndromes(codeword: Uint8Array, parityBytes: number): number[] {
+  return Array.from({ length: parityBytes }, (_, index) => polyEval(codeword, EXP[index]!));
 }
 
 function solveLinear(matrix: number[][], rhs: number[]): number[] | null {
@@ -116,10 +117,10 @@ function solveLinear(matrix: number[][], rhs: number[]): number[] | null {
   return rhs;
 }
 
-function correctKnownErasures(received: Uint8Array, erasures: number[]): number {
+function correctKnownErasures(received: Uint8Array, erasures: number[], parityBytes: number): number {
   if (erasures.length === 0) return 0;
-  if (erasures.length > RS_PARITY_BYTES) throw new Error("too many RS erasures");
-  const syn = syndromes(received);
+  if (erasures.length > parityBytes) throw new Error("too many RS erasures");
+  const syn = syndromes(received, parityBytes);
   const matrix = Array.from({ length: erasures.length }, (_, row) =>
     erasures.map((position) => gfPow(EXP[row]!, RS_CODEWORD_BYTES - 1 - position)),
   );
@@ -129,12 +130,12 @@ function correctKnownErasures(received: Uint8Array, erasures: number[]): number 
   return erasures.length;
 }
 
-function findErrataLocator(received: Uint8Array, erasures: number[]): number[] {
-  const syn = [0, ...syndromes(received)];
+function findErrataLocator(received: Uint8Array, erasures: number[], parityBytes: number): number[] {
+  const syn = [0, ...syndromes(received, parityBytes)];
   let locator = [1];
   for (const position of erasures) locator = polyMul(locator, [gfPow(2, received.length - 1 - position), 1]);
   let oldLocator = locator.slice();
-  for (let index = 0; index < RS_PARITY_BYTES - erasures.length; index++) {
+  for (let index = 0; index < parityBytes - erasures.length; index++) {
     const syndromeIndex = erasures.length + index + 1;
     let discrepancy = syn[syndromeIndex]!;
     for (let coefficient = 1; coefficient < locator.length; coefficient++) {
@@ -151,14 +152,14 @@ function findErrataLocator(received: Uint8Array, erasures: number[]): number[] {
   }
   locator = polyTrim(locator);
   const errataCount = locator.length - 1;
-  if ((errataCount - erasures.length) * 2 + erasures.length > RS_PARITY_BYTES) throw new Error("too many RS errors and erasures");
+  if ((errataCount - erasures.length) * 2 + erasures.length > parityBytes) throw new Error("too many RS errors and erasures");
   return locator;
 }
 
-function correctErrorsAndErasures(received: Uint8Array, erasures: number[]): { errors: number; erasures: number } {
-  const initialSyndromes = syndromes(received);
+function correctErrorsAndErasures(received: Uint8Array, erasures: number[], parityBytes: number): { errors: number; erasures: number } {
+  const initialSyndromes = syndromes(received, parityBytes);
   if (initialSyndromes.every((entry) => entry === 0)) return { errors: 0, erasures: 0 };
-  const locator = findErrataLocator(received, erasures);
+  const locator = findErrataLocator(received, erasures, parityBytes);
   const locations = findErrorLocations(locator);
   const positions = locations.map((location) => received.length - 1 - LOG[location]!);
   if (positions.some((position) => position < 0) || erasures.some((position) => !positions.includes(position))) throw new Error("invalid RS errata positions");
@@ -166,7 +167,7 @@ function correctErrorsAndErasures(received: Uint8Array, erasures: number[]): { e
   const magnitudes = solveLinear(matrix, initialSyndromes.slice(0, positions.length));
   if (!magnitudes) throw new Error("singular RS errata system");
   positions.forEach((position, index) => { received[position] = received[position]! ^ magnitudes[index]!; });
-  if (!syndromes(received).every((entry) => entry === 0)) throw new Error("uncorrectable RS codeword");
+  if (!syndromes(received, parityBytes).every((entry) => entry === 0)) throw new Error("uncorrectable RS codeword");
   return { errors: positions.length - erasures.length, erasures: erasures.length };
 }
 
@@ -226,12 +227,12 @@ function findErrorMagnitudes(evaluator: number[], locations: number[]): number[]
   });
 }
 
-function correctUnknownErrors(received: Uint8Array): number {
-  const syn = syndromes(received);
+function correctUnknownErrors(received: Uint8Array, parityBytes: number): number {
+  const syn = syndromes(received, parityBytes);
   if (syn.every((entry) => entry === 0)) return 0;
   const syndromePoly = polyTrim(syn.slice().reverse());
-  const monomial = [1, ...new Array<number>(RS_PARITY_BYTES).fill(0)];
-  const [locator, evaluator] = runEuclideanAlgorithm(monomial, syndromePoly, RS_PARITY_BYTES);
+  const monomial = [1, ...new Array<number>(parityBytes).fill(0)];
+  const [locator, evaluator] = runEuclideanAlgorithm(monomial, syndromePoly, parityBytes);
   const locations = findErrorLocations(locator);
   const magnitudes = findErrorMagnitudes(evaluator, locations);
   for (let index = 0; index < locations.length; index++) {
@@ -239,22 +240,23 @@ function correctUnknownErrors(received: Uint8Array): number {
     if (position < 0) throw new Error("invalid RS error position");
     received[position] = received[position]! ^ magnitudes[index]!;
   }
-  if (!syndromes(received).every((entry) => entry === 0)) throw new Error("uncorrectable RS codeword");
+  if (!syndromes(received, parityBytes).every((entry) => entry === 0)) throw new Error("uncorrectable RS codeword");
   return locations.length;
 }
 
-export function reedSolomonDecode(codeword: Uint8Array, erasures: number[] = []): { data: Uint8Array; correctedErrors: number; erasures: number } {
-  if (codeword.length !== RS_CODEWORD_BYTES) throw new Error(`RS codeword must be ${RS_CODEWORD_BYTES} bytes`);
+export function reedSolomonDecode(codeword: Uint8Array, erasures: number[] = [], parityBytes: number = RS_PARITY_BYTES): { data: Uint8Array; correctedErrors: number; erasures: number } {
+  if (parityBytes < 1 || parityBytes > RS_PARITY_BYTES) throw new Error(`RS parity must be 1..${RS_PARITY_BYTES} bytes`);
+  if (codeword.length <= parityBytes) throw new Error("RS codeword must exceed its parity length");
   if (new Set(erasures).size !== erasures.length || erasures.some((position) => !Number.isInteger(position) || position < 0 || position >= codeword.length)) {
     throw new Error("invalid RS erasure positions");
   }
   const received = codeword.slice();
   if (erasures.length === 0) {
-    const correctedErrors = correctUnknownErrors(received);
-    return { data: received.slice(0, RS_DATA_BYTES), correctedErrors, erasures: 0 };
+    const correctedErrors = correctUnknownErrors(received, parityBytes);
+    return { data: received.slice(0, codeword.length - parityBytes), correctedErrors, erasures: 0 };
   }
-  const corrected = correctErrorsAndErasures(received, erasures);
-  return { data: received.slice(0, RS_DATA_BYTES), correctedErrors: corrected.errors, erasures: corrected.erasures };
+  const corrected = correctErrorsAndErasures(received, erasures, parityBytes);
+  return { data: received.slice(0, codeword.length - parityBytes), correctedErrors: corrected.errors, erasures: corrected.erasures };
 }
 
 export function crc32c(bytes: Uint8Array): number {

@@ -1,4 +1,4 @@
-import { bytesToBits, crc32c, maskSymbol, reedSolomonEncode, RS_DATA_BYTES } from "@qccode/core";
+import { bytesToBits, crc32c, maskSymbol, reedSolomonEncode } from "@qccode/core";
 import {
   encodeBootstrap,
   LAYOUTS,
@@ -9,12 +9,12 @@ import {
   type QCCodeSymbol,
   type LayoutId,
 } from "@qccode/geometry";
-import { parseEnvelope } from "@qccode/protocol";
+import { BEARER_ENVELOPE_BYTES, isBearerEnvelope, parseBearerEnvelope, parseEnvelope } from "@qccode/protocol";
 
 export type EncodeOptions = { version?: "auto" | LayoutId };
 
 export function maximumEnvelopeBytes(layout: QCCodeLayout): number {
-  return layout.rsBlocks * RS_DATA_BYTES - 12;
+  return layout.visualVersion === 2 ? BEARER_ENVELOPE_BYTES : layout.rsBlocks * layout.rsDataBytes - 12;
 }
 
 export function selectLayout(envelopeLength: number, requested: "auto" | LayoutId = "auto"): QCCodeLayout {
@@ -23,13 +23,20 @@ export function selectLayout(envelopeLength: number, requested: "auto" | LayoutI
     if (envelopeLength > maximumEnvelopeBytes(layout)) throw new Error(`envelope does not fit ${requested}`);
     return layout;
   }
-  const layout = Object.values(LAYOUTS).find((candidate) => envelopeLength <= maximumEnvelopeBytes(candidate));
+  const layout = Object.values(LAYOUTS).find((candidate) => candidate.visualVersion === 1 && envelopeLength <= maximumEnvelopeBytes(candidate));
   if (!layout) throw new Error("envelope exceeds C3; use REFERENCE mode");
   return layout;
 }
 
 export function createVisualFrame(envelope: Uint8Array, layout: QCCodeLayout, mask: number): Uint8Array {
-  const sourceLength = layout.rsBlocks * RS_DATA_BYTES;
+  if (layout.visualVersion === 2) {
+    if (envelope.length !== BEARER_ENVELOPE_BYTES) throw new Error(`bearer envelope must be ${BEARER_ENVELOPE_BYTES} bytes`);
+    const frame = new Uint8Array(layout.rsDataBytes);
+    frame.set(envelope, 0);
+    new DataView(frame.buffer).setUint32(BEARER_ENVELOPE_BYTES, crc32c(envelope), false);
+    return frame;
+  }
+  const sourceLength = layout.rsBlocks * layout.rsDataBytes;
   const frame = new Uint8Array(sourceLength);
   const view = new DataView(frame.buffer);
   frame[0] = 0xa7;
@@ -45,10 +52,10 @@ export function createVisualFrame(envelope: Uint8Array, layout: QCCodeLayout, ma
 }
 
 export function encodeVisualCodewords(frame: Uint8Array, layout: QCCodeLayout): Uint8Array {
-  const blocks = Array.from({ length: layout.rsBlocks }, () => new Uint8Array(RS_DATA_BYTES));
+  const blocks = Array.from({ length: layout.rsBlocks }, () => new Uint8Array(layout.rsDataBytes));
   for (let index = 0; index < frame.length; index++) blocks[index % layout.rsBlocks]![Math.floor(index / layout.rsBlocks)] = frame[index]!;
-  const encoded = blocks.map(reedSolomonEncode);
-  const visual = new Uint8Array(layout.rsBlocks * 255);
+  const encoded = blocks.map((block) => reedSolomonEncode(block, layout.rsParityBytes));
+  const visual = new Uint8Array(layout.rsBlocks * layout.rsCodewordBytes);
   for (let index = 0; index < visual.length; index++) visual[index] = encoded[index % layout.rsBlocks]![Math.floor(index / layout.rsBlocks)]!;
   return visual;
 }
@@ -82,8 +89,10 @@ function ringPenalty(rings: Uint8Array[]): number {
 }
 
 export function encodeQCCode(envelope: Uint8Array, options: EncodeOptions = {}): QCCodeSymbol {
-  parseEnvelope(envelope);
-  const layout = selectLayout(envelope.length, options.version ?? "auto");
+  const bearer = isBearerEnvelope(envelope);
+  if (bearer) parseBearerEnvelope(envelope);
+  else parseEnvelope(envelope);
+  const layout = bearer ? LAYOUTS.S1 : selectLayout(envelope.length, options.version ?? "auto");
   let best: { mask: number; rings: Uint8Array[]; penalty: number } | undefined;
   for (let mask = 0; mask < 8; mask++) {
     const frame = createVisualFrame(envelope, layout, mask);
@@ -92,7 +101,7 @@ export function encodeQCCode(envelope: Uint8Array, options: EncodeOptions = {}):
     if (!best || penalty < best.penalty) best = { mask, rings, penalty };
   }
   return {
-    visualVersion: 1,
+    visualVersion: layout.visualVersion,
     layout,
     eccId: 1,
     mask: best!.mask,

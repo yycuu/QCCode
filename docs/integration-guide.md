@@ -111,6 +111,8 @@ resourceId:   16-byte opaque random ID
 - 服务器可以撤销、更新内容、限制次数和记录扫码。
 - 不会把敏感业务数据直接暴露在图片中。
 
+需要更简洁、更易扫的视觉时，REFERENCE 还可以使用稀疏布局 S1：数据环改为和定位环一样的粗圆头短弧，码内只放 48 字节 Bearer Envelope（12 字节随机 resourceId，无签名）。S1 依赖 96 位随机 ID 和服务端原子一次性核销，不支持离线验签；V1 签名布局保持不变。服务端通过 `QCCodeServer.issueBearer` / `redeemBearer` 签发与核销。
+
 ### 3.2 CHALLENGE
 
 CHALLENGE 用于登录、配对、授权和确认操作。Payload 固定为：

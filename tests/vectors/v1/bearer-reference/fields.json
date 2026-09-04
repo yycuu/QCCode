@@ -1,0 +1,11 @@
+{
+  "mode": "REFERENCE",
+  "flags": 3,
+  "issuerIdHex": "0011223344556677",
+  "messageType": 1001,
+  "messageIdHex": "102132435465768798a9bacb",
+  "issuedAt": 1700000000,
+  "expiresAt": 1700000300,
+  "resourceType": 7,
+  "resourceIdHex": "0123456789abcdeffedcba98"
+}

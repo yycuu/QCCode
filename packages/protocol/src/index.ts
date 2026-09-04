@@ -1,4 +1,6 @@
 export const ENVELOPE_MAGIC = new Uint8Array([0xc7, 0x51, 0x43, 0x01]);
+export const BEARER_MAGIC = new Uint8Array([0xc4, 0x02]);
+export const BEARER_ENVELOPE_BYTES = 48;
 export const PROTOCOL_VERSION_V1 = 0x10;
 export const ED25519_ALGORITHM = 0x01;
 export const ENVELOPE_FIXED_PREFIX_BYTES = 81;
@@ -40,6 +42,79 @@ export type EnvelopeV1 = Required<EnvelopeUnsignedV1> & {
   signedBytes: Uint8Array;
   bytes: Uint8Array;
 };
+
+export type BearerEnvelopeInput = {
+  issuerId: Uint8Array;
+  messageType: number;
+  messageId: Uint8Array;
+  issuedAt: number;
+  expiresAt: number;
+  resourceType: number;
+  resourceId: Uint8Array;
+  flags?: number;
+};
+
+export type BearerEnvelope = {
+  mode: QCCodeMode.REFERENCE;
+  flags: number;
+  issuerId: Uint8Array;
+  messageType: number;
+  messageId: Uint8Array;
+  issuedAt: number;
+  expiresAt: number;
+  resourceType: number;
+  resourceId: Uint8Array;
+  bytes: Uint8Array;
+};
+
+export function isBearerEnvelope(bytes: Uint8Array): boolean {
+  return bytes.length === BEARER_ENVELOPE_BYTES && equalAt(bytes, BEARER_MAGIC, 0);
+}
+
+export function encodeBearerEnvelope(input: BearerEnvelopeInput): Uint8Array {
+  requireLength("bearer issuerId", input.issuerId, 8);
+  requireLength("bearer messageId", input.messageId, 12);
+  requireLength("bearer resourceId", input.resourceId, 12);
+  requireUint("messageType", input.messageType, 0xffff);
+  requireUint("resourceType", input.resourceType, 0xffff);
+  const flags = input.flags ?? QCCodeFlag.SINGLE_USE | QCCodeFlag.SERVER_RESOLUTION_REQUIRED;
+  if ((flags & ~V1_KNOWN_FLAGS) !== 0) throw new QCCodeProtocolError("UNSUPPORTED_FLAGS", "reserved flags must be zero");
+  if (input.expiresAt <= input.issuedAt || input.expiresAt > 0xffff_ffff) throw new QCCodeProtocolError("PROTOCOL_INVALID", "invalid bearer validity interval");
+  const bytes = new Uint8Array(BEARER_ENVELOPE_BYTES);
+  const view = new DataView(bytes.buffer);
+  bytes.set(BEARER_MAGIC, 0);
+  view.setUint8(2, QCCodeMode.REFERENCE);
+  view.setUint8(3, flags);
+  view.setUint16(4, input.messageType, false);
+  bytes.set(input.issuerId, 6);
+  bytes.set(input.messageId, 14);
+  view.setUint32(26, input.issuedAt, false);
+  view.setUint32(30, input.expiresAt, false);
+  view.setUint16(34, input.resourceType, false);
+  bytes.set(input.resourceId, 36);
+  return bytes;
+}
+
+export function parseBearerEnvelope(bytes: Uint8Array): BearerEnvelope {
+  if (!isBearerEnvelope(bytes)) throw new QCCodeProtocolError("PROTOCOL_INVALID", "invalid bearer envelope magic or length");
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const result: BearerEnvelope = {
+    mode: QCCodeMode.REFERENCE,
+    flags: view.getUint8(3),
+    issuerId: bytes.slice(6, 14),
+    messageType: view.getUint16(4, false),
+    messageId: bytes.slice(14, 26),
+    issuedAt: view.getUint32(26, false),
+    expiresAt: view.getUint32(30, false),
+    resourceType: view.getUint16(34, false),
+    resourceId: bytes.slice(36, 48),
+    bytes: bytes.slice(),
+  };
+  if (result.mode !== QCCodeMode.REFERENCE) throw new QCCodeProtocolError("PROTOCOL_INVALID", "bearer envelope must be REFERENCE");
+  if ((result.flags & ~V1_KNOWN_FLAGS) !== 0) throw new QCCodeProtocolError("UNSUPPORTED_FLAGS", "reserved flags must be zero");
+  if (result.expiresAt <= result.issuedAt) throw new QCCodeProtocolError("PROTOCOL_INVALID", "invalid bearer validity interval");
+  return result;
+}
 
 export class QCCodeProtocolError extends Error {
   constructor(

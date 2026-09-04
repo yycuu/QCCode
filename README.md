@@ -32,6 +32,8 @@ The normative V1 format is documented in [docs/specification-v1.md](docs/specifi
 
 V1 data rings use four ordered luminance levels per rounded arc slot, carrying two bits per slot. The common C1 layout uses six data rings and retains one full RS(255,191) codeword. Orientation and bootstrap rings remain binary so scanners can locate and identify a symbol before classifying multilevel data.
 
+The sparse S1 layout draws the data area with the same guard-weight rounded dashes as the orientation ring: six rings of 40–72 slots, one shortened RS(86,54) codeword, and a 48-byte bearer envelope verified server-side with atomic single-use redemption. S1 trades offline signatures for a visually simpler, denser-to-camera-free symbol; V1 signed layouts remain available for offline verification.
+
 Implemented packages cover the canonical envelope, browser Ed25519 verification, trust storage, CRC-32C, RS errors and erasures, interleaving, masks, geometry, ideal and raster decoding, SVG and Canvas rendering, camera/image scanner APIs, browser SDK, server SDK, atomic in-process replay protection, the reference HTTP/WebSocket server, and the demo application.
 
 ## License

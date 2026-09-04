@@ -4,7 +4,7 @@ import { decodeIdealSymbol } from "../packages/decoder/src/index.js";
 import { encodeQCCode } from "../packages/encoder/src/index.js";
 import { equalBytes, fromBase64Url } from "../packages/protocol/src/index.js";
 
-const vectorNames = ["inline-hello", "reference-token", "challenge-login", "expired", "invalid-signature", "modified-payload", "wrong-issuer", "wrong-kid", "replay"];
+const vectorNames = ["inline-hello", "reference-token", "challenge-login", "expired", "invalid-signature", "modified-payload", "wrong-issuer", "wrong-kid", "replay", "bearer-reference"];
 
 describe("committed V1 golden vectors", () => {
   it.each(vectorNames)("reproduces visual layout for %s", async (name) => {

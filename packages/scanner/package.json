@@ -42,6 +42,7 @@
   },
   "dependencies": {
     "@qccode/decoder": "workspace:*",
+    "@qccode/protocol": "workspace:*",
     "@qccode/security": "workspace:*",
     "@qccode/vision": "workspace:*"
   },

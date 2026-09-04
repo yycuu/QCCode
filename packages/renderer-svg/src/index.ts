@@ -43,6 +43,21 @@ function dataArcBlocks(bits: ArrayLike<number>, inner: number, outer: number, ta
   return markers;
 }
 
+function dataArcDashes(bits: ArrayLike<number>, inner: number, outer: number, levels: readonly string[]): string[] {
+  const radius = (inner + outer) / 2;
+  const pitch = Math.PI * 2 / bits.length;
+  const markers: string[] = [];
+  for (let slot = 0; slot < bits.length; slot++) {
+    const value = bits[slot]!;
+    if (value === 0) continue;
+    const start = -Math.PI / 2 + (slot + 0.42) * pitch;
+    const end = -Math.PI / 2 + (slot + 0.58) * pitch;
+    const [x1, y1] = point(radius, start), [x2, y2] = point(radius, end);
+    markers.push(`<path d="M${x1.toFixed(3)} ${y1.toFixed(3)}A${radius.toFixed(3)} ${radius.toFixed(3)} 0 0 1 ${x2.toFixed(3)} ${y2.toFixed(3)}" fill="none" stroke="${escapeXml(levels[value] ?? levels[3]!)}" stroke-width="${(outer - inner).toFixed(3)}" stroke-linecap="round"/>`);
+  }
+  return markers;
+}
+
 function escapeXml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
@@ -89,7 +104,8 @@ export function renderSvg(symbol: QCCodeSymbol, options: SvgRenderOptions = {}):
   symbol.dataRings.forEach((bits, ring) => {
     const ringInner = inner + ring * pitch + 0.17;
     const ringOuter = inner + (ring + 1) * pitch - 0.17;
-    paths.push(...dataArcBlocks(bits, ringInner, ringOuter, tangential, levels));
+    if (symbol.layout.visualVersion === 2) paths.push(...dataArcDashes(bits, ringInner, ringOuter, levels));
+    else paths.push(...dataArcBlocks(bits, ringInner, ringOuter, tangential, levels));
   });
   const center = options.center ?? { mode: "none" };
   if (center.mode === "logo") {

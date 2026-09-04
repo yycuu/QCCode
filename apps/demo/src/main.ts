@@ -1,5 +1,5 @@
 import { encodeQCCode } from "@qccode/encoder";
-import { fromBase64Url, parseEnvelope, toBase64Url } from "@qccode/protocol";
+import { fromBase64Url, isBearerEnvelope, parseBearerEnvelope, parseEnvelope, toBase64Url } from "@qccode/protocol";
 import { renderCanvas } from "@qccode/renderer-canvas";
 import { renderSvg } from "@qccode/renderer-svg";
 import { QCCodeScanner } from "@qccode/scanner";
@@ -11,7 +11,7 @@ const root = document.querySelector<HTMLElement>("#app")!;
 root.innerHTML = `
   <header><div class="eyebrow">QCCODE / V1</div><h1>Signed data,<br><em>drawn in circles.</em></h1><p>服务端签名，显示端只编码。每一次验证都保留原始 Envelope。</p></header>
   <section class="workspace">
-    <form id="issue"><h2>01 / Server Control</h2><label>Mode<select name="mode"><option>REFERENCE</option><option>CHALLENGE</option><option>INLINE</option></select></label><label>Message Type<input name="messageType" type="number" value="1001"></label><label>Payload<textarea name="payload">{"action":"demo","device":"display-01"}</textarea></label><label>Center Logo URL · optional<input name="logo" value="/qccode-mark.svg"></label><div class="row"><label>Expires in seconds<input name="expiresIn" type="number" value="300"></label><label class="check"><input name="singleUse" type="checkbox" checked> Single use</label></div><button>Issue signed QCCode</button></form>
+    <form id="issue"><h2>01 / Server Control</h2><label>Mode<select name="mode"><option>REFERENCE</option><option>CHALLENGE</option><option>INLINE</option></select></label><label>Layout<select name="layout"><option>SPARSE</option><option>V1</option></select></label><label>Message Type<input name="messageType" type="number" value="1001"></label><label>Payload<textarea name="payload">{"action":"demo","device":"display-01"}</textarea></label><label>Center Logo URL · optional<input name="logo" value="/qccode-mark.svg"></label><div class="row"><label>Expires in seconds<input name="expiresIn" type="number" value="300"></label><label class="check"><input name="singleUse" type="checkbox" checked> Single use</label></div><button>Issue QCCode</button></form>
     <article class="display"><div class="section-head"><h2>02 / Display Client</h2><span id="socket">CONNECTING</span></div><div id="symbol" class="symbol"><div class="placeholder">Waiting for<br>signed envelope</div></div><div id="meta" class="meta"></div></article>
     <article class="scanner"><h2>03 / Scanner Verification</h2><div class="checks"><div>Visual decode <b id="visual">—</b></div><div>Cryptographic signature <b id="signature">—</b></div><div>Issuer trust <b id="issuer">—</b></div><div>Time validation <b id="time">—</b></div></div><video id="camera" playsinline muted></video><div class="scanner-actions"><button id="camera-start" type="button">Start camera</button><button id="camera-scan" type="button" disabled>Scan frame</button></div><label class="upload">Scan image<input id="image-upload" type="file" accept="image/*"></label><button id="redeem" disabled>Submit original Envelope</button></article>
     <article class="result"><h2>04 / Result</h2><strong id="result">NO RESULT</strong><pre id="details"></pre></article>
@@ -41,19 +41,26 @@ function getScanner(): Promise<QCCodeScanner> {
 async function showScan(scan: Awaited<ReturnType<QCCodeScanner["scanCanvas"]>>): Promise<void> {
   currentEnvelope = toBase64Url(scan.decoded.envelopeBytes);
   document.querySelector("#visual")!.textContent = `PASS ${(scan.visual.confidence * 100).toFixed(0)}%`;
-  document.querySelector("#signature")!.textContent = scan.security.signatureValid ? "VALID" : "INVALID";
-  document.querySelector("#issuer")!.textContent = scan.security.issuerTrusted ? "TRUSTED" : "UNKNOWN";
-  document.querySelector("#time")!.textContent = scan.security.expired ? "EXPIRED" : scan.security.notYetValid ? "NOT YET VALID" : "PASS";
-  (document.querySelector("#redeem") as HTMLButtonElement).disabled = !scan.security.signatureValid;
+  if (scan.security.kind === "bearer") {
+    document.querySelector("#signature")!.textContent = "SERVER";
+    document.querySelector("#issuer")!.textContent = "SERVER";
+    document.querySelector("#time")!.textContent = scan.security.expired ? "EXPIRED" : scan.security.notYetValid ? "NOT YET VALID" : "PASS";
+    (document.querySelector("#redeem") as HTMLButtonElement).disabled = scan.security.expired || scan.security.notYetValid;
+  } else {
+    document.querySelector("#signature")!.textContent = scan.security.signatureValid ? "VALID" : "INVALID";
+    document.querySelector("#issuer")!.textContent = scan.security.issuerTrusted ? "TRUSTED" : "UNKNOWN";
+    document.querySelector("#time")!.textContent = scan.security.expired ? "EXPIRED" : scan.security.notYetValid ? "NOT YET VALID" : "PASS";
+    (document.querySelector("#redeem") as HTMLButtonElement).disabled = !scan.security.signatureValid;
+  }
 }
 
 async function display(envelopeBase64Url: string): Promise<void> {
   if (currentEnvelope === envelopeBase64Url) return;
   currentEnvelope = envelopeBase64Url;
   const bytes = fromBase64Url(envelopeBase64Url);
-  const envelope = parseEnvelope(bytes);
+  const envelope = isBearerEnvelope(bytes) ? parseBearerEnvelope(bytes) : parseEnvelope(bytes);
   const symbol = encodeQCCode(bytes);
-  document.querySelector("#symbol")!.innerHTML = renderSvg(symbol, { size: 560, title: "Signed QCCode", center: currentLogo ? { mode: "logo", imageHref: currentLogo, scale: 0.72 } : { mode: "none" } });
+  document.querySelector("#symbol")!.innerHTML = renderSvg(symbol, { size: 560, title: "QCCode", center: currentLogo ? { mode: "logo", imageHref: currentLogo, scale: 0.72 } : { mode: "none" } });
   document.querySelector("#meta")!.textContent = `${symbol.layout.id} · ${symbol.layout.ringSlots.length} rings · mask ${symbol.mask} · ${bytes.length} envelope bytes · expires ${new Date(Number(envelope.expiresAt) * 1000).toLocaleTimeString()}`;
   document.querySelector("#visual")!.textContent = "SCANNING";
   const canvas = document.createElement("canvas");
@@ -73,7 +80,7 @@ document.querySelector("#issue")!.addEventListener("submit", async (event) => {
   const payloadText = String(data.get("payload"));
   let payload: unknown = payloadText;
   try { payload = JSON.parse(payloadText); } catch { /* text payload */ }
-  const response = await fetch(`${api}/qccode/v1/issue`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: data.get("mode"), messageType: Number(data.get("messageType")), expiresIn: Number(data.get("expiresIn")), singleUse: data.get("singleUse") === "on", payload }) });
+  const response = await fetch(`${api}/qccode/v1/issue`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: data.get("mode"), layout: data.get("layout"), messageType: Number(data.get("messageType")), expiresIn: Number(data.get("expiresIn")), singleUse: data.get("singleUse") === "on", payload }) });
   const body = await response.json();
   if (!response.ok) throw new Error(body.error);
   await display(body.envelopeBase64Url);

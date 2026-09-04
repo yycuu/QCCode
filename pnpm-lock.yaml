@@ -118,6 +118,9 @@ importers:
       '@qccode/decoder':
         specifier: workspace:*
         version: link:../decoder
+      '@qccode/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       '@qccode/security':
         specifier: workspace:*
         version: link:../security

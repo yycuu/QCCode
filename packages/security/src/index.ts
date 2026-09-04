@@ -1,7 +1,10 @@
 import {
   attachSignature,
   encodeSignedBytes,
+  isBearerEnvelope,
+  parseBearerEnvelope,
   parseEnvelope,
+  type BearerEnvelope,
   type EnvelopeUnsignedV1,
   type EnvelopeV1,
 } from "@qccode/protocol";
@@ -92,6 +95,7 @@ export async function issueEnvelope(input: EnvelopeUnsignedV1, privateKeyPkcs8: 
 }
 
 export type OfflineVerificationResult = {
+  kind: "signed";
   envelope: EnvelopeV1;
   signatureValid: boolean;
   issuerTrusted: boolean;
@@ -101,6 +105,28 @@ export type OfflineVerificationResult = {
   offlineVerified: boolean;
   error?: "UNKNOWN_ISSUER_OR_KEY" | "KEY_REVOKED" | "KEY_OUTSIDE_VALIDITY" | "SIGNATURE_INVALID" | "EXPIRED" | "NOT_YET_VALID";
 };
+
+export type BearerVerificationResult = {
+  kind: "bearer";
+  envelope: BearerEnvelope;
+  expired: boolean;
+  notYetValid: boolean;
+  offlineVerified: false;
+};
+
+export function verifyBearerEnvelope(bytes: Uint8Array, options: { now?: bigint; clockSkewSeconds?: bigint } = {}): BearerVerificationResult {
+  const envelope = parseBearerEnvelope(bytes);
+  const now = options.now ?? BigInt(Math.floor(Date.now() / 1000));
+  const skew = options.clockSkewSeconds ?? 120n;
+  const expiresAt = BigInt(envelope.expiresAt);
+  return {
+    kind: "bearer",
+    envelope,
+    expired: expiresAt <= now - skew,
+    notYetValid: BigInt(envelope.issuedAt) > now + skew,
+    offlineVerified: false,
+  };
+}
 
 export async function verifyEnvelopeOffline(
   bytes: Uint8Array,
@@ -113,14 +139,14 @@ export async function verifyEnvelopeOffline(
   const key = await trustStore.getPublicKey(envelope.issuerId, envelope.keyId);
   const expired = envelope.expiresAt <= now - skew;
   const notYetValid = envelope.issuedAt > now + skew;
-  if (!key) return { envelope, signatureValid: false, issuerTrusted: false, keyStatus: "UNKNOWN", expired, notYetValid, offlineVerified: false, error: "UNKNOWN_ISSUER_OR_KEY" };
-  if (key.status === "REVOKED") return { envelope, signatureValid: false, issuerTrusted: true, keyStatus: key.status, expired, notYetValid, offlineVerified: false, error: "KEY_REVOKED" };
+  if (!key) return { kind: "signed", envelope, signatureValid: false, issuerTrusted: false, keyStatus: "UNKNOWN", expired, notYetValid, offlineVerified: false, error: "UNKNOWN_ISSUER_OR_KEY" };
+  if (key.status === "REVOKED") return { kind: "signed", envelope, signatureValid: false, issuerTrusted: true, keyStatus: key.status, expired, notYetValid, offlineVerified: false, error: "KEY_REVOKED" };
   if (envelope.issuedAt < key.notBefore || envelope.issuedAt >= key.notAfter) {
-    return { envelope, signatureValid: false, issuerTrusted: true, keyStatus: key.status, expired, notYetValid, offlineVerified: false, error: "KEY_OUTSIDE_VALIDITY" };
+    return { kind: "signed", envelope, signatureValid: false, issuerTrusted: true, keyStatus: key.status, expired, notYetValid, offlineVerified: false, error: "KEY_OUTSIDE_VALIDITY" };
   }
   const signatureValid = await verifyEd25519(envelope.signedBytes, envelope.signature, key.publicKey);
-  if (!signatureValid) return { envelope, signatureValid: false, issuerTrusted: true, keyStatus: key.status, expired, notYetValid, offlineVerified: false, error: "SIGNATURE_INVALID" };
-  if (notYetValid) return { envelope, signatureValid: true, issuerTrusted: true, keyStatus: key.status, expired, notYetValid, offlineVerified: true, error: "NOT_YET_VALID" };
-  if (expired) return { envelope, signatureValid: true, issuerTrusted: true, keyStatus: key.status, expired, notYetValid, offlineVerified: true, error: "EXPIRED" };
-  return { envelope, signatureValid: true, issuerTrusted: true, keyStatus: key.status, expired: false, notYetValid: false, offlineVerified: true };
+  if (!signatureValid) return { kind: "signed", envelope, signatureValid: false, issuerTrusted: true, keyStatus: key.status, expired, notYetValid, offlineVerified: false, error: "SIGNATURE_INVALID" };
+  if (notYetValid) return { kind: "signed", envelope, signatureValid: true, issuerTrusted: true, keyStatus: key.status, expired, notYetValid, offlineVerified: true, error: "NOT_YET_VALID" };
+  if (expired) return { kind: "signed", envelope, signatureValid: true, issuerTrusted: true, keyStatus: key.status, expired, notYetValid, offlineVerified: true, error: "EXPIRED" };
+  return { kind: "signed", envelope, signatureValid: true, issuerTrusted: true, keyStatus: key.status, expired: false, notYetValid: false, offlineVerified: true };
 }

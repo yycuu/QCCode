@@ -5,9 +5,11 @@ import { createVisualFrame, encodeQCCode, encodeVisualCodewords } from "../packa
 import {
   QCCodeFlag,
   QCCodeMode,
+  encodeBearerEnvelope,
   encodeChallengePayload,
   encodeReferencePayload,
   encodeSignedBytes,
+  parseBearerEnvelope,
   parseEnvelope,
   toBase64Url,
   type EnvelopeUnsignedV1,
@@ -78,4 +80,42 @@ for (const definition of definitions) {
   ]);
 }
 
-console.log(`Generated ${definitions.length} QCCode V1 vectors in ${out}`);
+const bearerDefinitions: Array<{ name: string; input: Parameters<typeof encodeBearerEnvelope>[0]; expected: string }> = [
+  { name: "bearer-reference", input: {
+    issuerId: fromHex("0011223344556677"),
+    messageType: 1001,
+    messageId: fromHex("102132435465768798a9bacb"),
+    issuedAt: 1_700_000_000,
+    expiresAt: 1_700_000_300,
+    resourceType: 7,
+    resourceId: fromHex("0123456789abcdeffedcba98"),
+  }, expected: "VALID" },
+];
+
+for (const definition of bearerDefinitions) {
+  const envelope = encodeBearerEnvelope(definition.input);
+  const parsed = parseBearerEnvelope(envelope);
+  const symbol = encodeQCCode(envelope);
+  const frame = createVisualFrame(envelope, symbol.layout, symbol.mask);
+  const codewords = encodeVisualCodewords(frame, symbol.layout);
+  const directory = join(out, definition.name);
+  await mkdir(directory, { recursive: true });
+  const fields = {
+    mode: QCCodeMode[parsed.mode], flags: parsed.flags, issuerIdHex: hex(parsed.issuerId),
+    messageType: parsed.messageType, messageIdHex: hex(parsed.messageId), issuedAt: parsed.issuedAt,
+    expiresAt: parsed.expiresAt, resourceType: parsed.resourceType, resourceIdHex: hex(parsed.resourceId),
+  };
+  await Promise.all([
+    writeFile(join(directory, "fields.json"), JSON.stringify(fields, null, 2) + "\n"),
+    writeFile(join(directory, "envelope.hex"), hex(envelope) + "\n"),
+    writeFile(join(directory, "envelope.base64url.txt"), toBase64Url(envelope) + "\n"),
+    writeFile(join(directory, "visual-frame-before-padding.hex"), hex(frame.slice(0, 52)) + "\n"),
+    writeFile(join(directory, "rs-source.hex"), hex(frame) + "\n"),
+    writeFile(join(directory, "rs-codewords.hex"), hex(codewords) + "\n"),
+    writeFile(join(directory, "bootstrap-bits.txt"), Array.from(symbol.bootstrap).join("") + "\n"),
+    writeFile(join(directory, "expected-ring-slots.txt"), symbol.dataRings.map((ring) => Array.from(ring).join("")).join("\n") + "\n"),
+    writeFile(join(directory, "expected.json"), JSON.stringify({ result: definition.expected, layout: symbol.layout.id, mask: symbol.mask, envelopeBytes: envelope.length, visualBits: bytesToBits(codewords).length }, null, 2) + "\n"),
+  ]);
+}
+
+console.log(`Generated ${definitions.length + bearerDefinitions.length} QCCode vectors in ${out}`);

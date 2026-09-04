@@ -43,3 +43,28 @@ describe("RS(255,191)", () => {
     expect(result.erasures).toBe(44);
   });
 });
+
+describe("shortened RS(86,54)", () => {
+  const source = Uint8Array.from({ length: 54 }, (_, index) => (index * 29 + 7) & 255);
+
+  it("round trips with 32 parity bytes", () => {
+    expect(reedSolomonDecode(reedSolomonEncode(source, 32), [], 32).data).toEqual(source);
+  });
+
+  it("corrects 16 unknown byte errors", () => {
+    const damaged = reedSolomonEncode(source, 32);
+    for (let index = 0; index < 16; index++) damaged[(index * 5) % 86] ^= index + 1;
+    const result = reedSolomonDecode(damaged, [], 32);
+    expect(result.data).toEqual(source);
+    expect(result.correctedErrors).toBe(16);
+  });
+
+  it("corrects 32 known erasures", () => {
+    const damaged = reedSolomonEncode(source, 32);
+    const positions = Array.from({ length: 32 }, (_, index) => (index * 7) % 86);
+    for (const position of positions) damaged[position] = 0;
+    const result = reedSolomonDecode(damaged, positions, 32);
+    expect(result.data).toEqual(source);
+    expect(result.erasures).toBe(32);
+  });
+});

@@ -10,6 +10,7 @@ import {
   encodeReferencePayload,
   fromBase64Url,
   generateEd25519KeyPair,
+  isBearerEnvelope,
   toBase64Url,
 } from "@qccode/server-sdk";
 
@@ -41,6 +42,22 @@ app.post("/qccode/v1/issue", async (request, response) => {
   try {
     const mode = QCCodeMode[String(request.body.mode ?? "REFERENCE").toUpperCase() as keyof typeof QCCodeMode];
     if (typeof mode !== "number") throw new Error("invalid mode");
+    const sparse = String(request.body.layout ?? "SPARSE").toUpperCase() === "SPARSE";
+    if (sparse && mode === QCCodeMode.REFERENCE) {
+      const resourceId = crypto.getRandomValues(new Uint8Array(12));
+      const issued = await qcCode.issueBearer({
+        resourceType: Number(request.body.resourceType ?? 1),
+        resourceId,
+        messageType: Number(request.body.messageType ?? 1001),
+        expiresIn: Number(request.body.expiresIn ?? 300),
+        singleUse: Boolean(request.body.singleUse),
+        resourceValue: request.body.payload ?? null,
+      });
+      const message = JSON.stringify({ type: "qccode.envelope", sequence: Date.now(), envelope: issued.envelopeBase64Url });
+      for (const socket of sockets.clients) if (socket.readyState === socket.OPEN) socket.send(message);
+      response.json({ envelopeBase64Url: issued.envelopeBase64Url });
+      return;
+    }
     let payload: Uint8Array;
     if (mode === QCCodeMode.REFERENCE) {
       const resourceId = crypto.getRandomValues(new Uint8Array(16));
@@ -63,7 +80,9 @@ app.post("/qccode/v1/issue", async (request, response) => {
 });
 
 app.post(["/qccode/v1/redeem", "/qccode/v1/resolve"], async (request, response) => {
-  const result = await qcCode.redeem(String(request.body.envelope ?? ""));
+  let envelopeBytes: Uint8Array;
+  try { envelopeBytes = fromBase64Url(String(request.body.envelope ?? "")); } catch { response.status(400).json({ status: "INVALID" }); return; }
+  const result = isBearerEnvelope(envelopeBytes) ? await qcCode.redeemBearer(envelopeBytes) : await qcCode.redeem(String(request.body.envelope ?? ""));
   response.status(result.status === "ACCEPTED" ? 200 : 400).json(result);
 });
 

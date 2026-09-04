@@ -44,6 +44,23 @@ function drawDataArcBlocks(ctx: CanvasRenderingContext2D, bits: ArrayLike<number
   }
 }
 
+function drawDataDashes(ctx: CanvasRenderingContext2D, bits: ArrayLike<number>, inner: number, outer: number, levels: readonly [string, string, string, string]): void {
+  const radius = (inner + outer) / 2;
+  const pitch = Math.PI * 2 / bits.length;
+  ctx.lineCap = "round";
+  ctx.lineWidth = outer - inner;
+  for (let slot = 0; slot < bits.length; slot++) {
+    const value = bits[slot]!;
+    if (value === 0) continue;
+    const start = -Math.PI / 2 + (slot + 0.42) * pitch;
+    const end = -Math.PI / 2 + (slot + 0.58) * pitch;
+    ctx.strokeStyle = levels[value]!;
+    ctx.beginPath();
+    ctx.arc(128, 128, radius, start, end);
+    ctx.stroke();
+  }
+}
+
 export function renderCanvas(symbol: QCCodeSymbol, canvas: HTMLCanvasElement | OffscreenCanvas, options: CanvasRenderOptions = {}): void {
   const size = options.size ?? 512;
   const foreground = options.foreground ?? "#000000";
@@ -75,7 +92,10 @@ export function renderCanvas(symbol: QCCodeSymbol, canvas: HTMLCanvasElement | O
   const pitch = (87 - inner) / symbol.dataRings.length;
   const outerCount = symbol.dataRings[symbol.dataRings.length - 1]!.length;
   const tangential = (Math.PI * 2 * (87 - 0.17) / outerCount) * 0.9;
-  symbol.dataRings.forEach((bits, ring) => drawDataArcBlocks(ctx, bits, inner + ring * pitch + 0.17, inner + (ring + 1) * pitch - 0.17, tangential, levels));
+  symbol.dataRings.forEach((bits, ring) => {
+    if (symbol.layout.visualVersion === 2) drawDataDashes(ctx, bits, inner + ring * pitch + 0.17, inner + (ring + 1) * pitch - 0.17, levels);
+    else drawDataArcBlocks(ctx, bits, inner + ring * pitch + 0.17, inner + (ring + 1) * pitch - 0.17, tangential, levels);
+  });
   const center = options.center ?? { mode: "none" };
   if (center.mode === "logo") {
     const diameter = inner * 2 * Math.min(center.scale ?? 0.82, 0.82);

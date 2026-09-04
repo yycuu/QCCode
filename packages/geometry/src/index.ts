@@ -1,37 +1,50 @@
-export type LayoutId = "C1" | "C2" | "C3";
+export type LayoutId = "C1" | "C2" | "C3" | "S1";
 
 export type QCCodeLayout = {
   id: LayoutId;
   numericId: 1 | 2 | 3;
+  visualVersion: 1 | 2;
   rsBlocks: 1 | 2 | 3;
   ringSlots: readonly number[];
   totalSlots: number;
   bitsPerSlot: 2;
   permutationMultiplier: number;
   centerRadius: number;
+  rsDataBytes: number;
+  rsParityBytes: number;
+  rsCodewordBytes: number;
 };
 
 export const LAYOUTS: Readonly<Record<LayoutId, QCCodeLayout>> = {
   C1: {
-    id: "C1", numericId: 1, rsBlocks: 1,
+    id: "C1", numericId: 1, visualVersion: 1, rsBlocks: 1,
     ringSlots: [140, 152, 164, 176, 188, 200],
     totalSlots: 1020, bitsPerSlot: 2, permutationMultiplier: 509, centerRadius: 0.38,
+    rsDataBytes: 191, rsParityBytes: 64, rsCodewordBytes: 255,
   },
   C2: {
-    id: "C2", numericId: 2, rsBlocks: 2,
+    id: "C2", numericId: 2, visualVersion: 1, rsBlocks: 2,
     ringSlots: [194, 202, 210, 218, 226, 234, 242, 250, 264],
     totalSlots: 2040, bitsPerSlot: 2, permutationMultiplier: 1031, centerRadius: 0.34,
+    rsDataBytes: 191, rsParityBytes: 64, rsCodewordBytes: 255,
   },
   C3: {
-    id: "C3", numericId: 3, rsBlocks: 3,
+    id: "C3", numericId: 3, visualVersion: 1, rsBlocks: 3,
     ringSlots: [222, 228, 234, 240, 246, 252, 258, 264, 270, 276, 282, 288],
     totalSlots: 3060, bitsPerSlot: 2, permutationMultiplier: 1543, centerRadius: 0.30,
+    rsDataBytes: 191, rsParityBytes: 64, rsCodewordBytes: 255,
+  },
+  S1: {
+    id: "S1", numericId: 1, visualVersion: 2, rsBlocks: 1,
+    ringSlots: [40, 48, 55, 61, 68, 72],
+    totalSlots: 344, bitsPerSlot: 2, permutationMultiplier: 171, centerRadius: 0.38,
+    rsDataBytes: 54, rsParityBytes: 32, rsCodewordBytes: 86,
   },
 };
 
 for (const layout of Object.values(LAYOUTS)) {
   const actual = layout.ringSlots.reduce((sum, count) => sum + count, 0);
-  if (actual !== layout.totalSlots || actual * layout.bitsPerSlot !== layout.rsBlocks * 255 * 8) throw new Error(`invalid ${layout.id} capacity`);
+  if (actual !== layout.totalSlots || actual * layout.bitsPerSlot !== layout.rsBlocks * layout.rsCodewordBytes * 8) throw new Error(`invalid ${layout.id} capacity`);
 }
 
 export const ORIENTATION_BITS = Uint8Array.from(
@@ -87,7 +100,8 @@ function popcount32(value: number): number {
 
 export function encodeBootstrap(layout: QCCodeLayout, mask: number): Uint8Array {
   if (!Number.isInteger(mask) || mask < 0 || mask > 7) throw new Error("invalid mask");
-  const message = (0b10110 << 11) | (layout.numericId << 9) | (0b01 << 7) | (mask << 4);
+  const preamble = layout.visualVersion === 2 ? 0b10111 : 0b10110;
+  const message = (preamble << 11) | (layout.numericId << 9) | (0b01 << 7) | (mask << 4);
   const code31 = ((message << 15) ^ bchRemainder(message << 15)) >>> 0;
   const parity = popcount32(code31) & 1;
   const code32 = ((code31 << 1) | parity) >>> 0;
@@ -103,10 +117,11 @@ export function decodeBootstrap(bits: ArrayLike<number>): { layout: QCCodeLayout
     for (let index = 0; index < 32; index++) received = (received * 2 + (bits[offset + index]! & 1)) >>> 0;
     let bestMessage = -1, bestDistance = 33;
     for (let message = 0; message <= 0xffff; message++) {
-      if ((message >>> 11) !== 0b10110 || (message & 0xf) !== 0) continue;
+      const preamble = message >>> 11;
+      if ((preamble !== 0b10110 && preamble !== 0b10111) || (message & 0xf) !== 0) continue;
       const layoutId = (message >>> 9) & 3;
       const ecc = (message >>> 7) & 3;
-      if (layoutId === 0 || ecc !== 1) continue;
+      if (ecc !== 1 || !layoutForMessage(preamble, layoutId)) continue;
       const code31 = ((message << 15) ^ bchRemainder(message << 15)) >>> 0;
       const code32 = ((code31 << 1) | (popcount32(code31) & 1)) >>> 0;
       const distance = popcount32(received ^ code32);
@@ -118,10 +133,17 @@ export function decodeBootstrap(bits: ArrayLike<number>): { layout: QCCodeLayout
   if (valid.length === 0) throw new Error("BOOTSTRAP_INVALID");
   if (valid.length === 2 && valid[0]!.message !== valid[1]!.message && valid[0]!.distance === valid[1]!.distance) throw new Error("BOOTSTRAP_AMBIGUOUS");
   const selected = valid[0]!;
+  const preamble = selected.message >>> 11;
   const numericId = (selected.message >>> 9) & 3;
-  const layout = Object.values(LAYOUTS).find((candidate) => candidate.numericId === numericId);
+  const layout = layoutForMessage(preamble, numericId);
   if (!layout) throw new Error("BOOTSTRAP_INVALID");
   return { layout, mask: (selected.message >>> 4) & 7, correctedBits: selected.distance };
+}
+
+function layoutForMessage(preamble: number, numericId: number): QCCodeLayout | undefined {
+  return Object.values(LAYOUTS).find((candidate) =>
+    (preamble === 0b10110 ? candidate.visualVersion === 1 : candidate.visualVersion === 2) && candidate.numericId === numericId,
+  );
 }
 
 export function recoverOrientation(sampled: ArrayLike<number>): { offset: number; mirrored: boolean; confidence: number; margin: number } {
@@ -146,7 +168,7 @@ export function recoverOrientation(sampled: ArrayLike<number>): { offset: number
 }
 
 export type QCCodeSymbol = {
-  visualVersion: 1;
+  visualVersion: 1 | 2;
   layout: QCCodeLayout;
   eccId: 1;
   mask: number;

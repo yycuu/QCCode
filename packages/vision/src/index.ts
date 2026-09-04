@@ -104,7 +104,7 @@ export function decodeImageData(image: ImageData): VisionDecodeResult {
     return values;
   });
   return {
-    symbol: { visualVersion: 1, layout: bootstrap.layout, eccId: 1, mask: bootstrap.mask, orientation: ORIENTATION_BITS.slice(), bootstrap: bootstrapBits, dataRings },
+    symbol: { visualVersion: bootstrap.layout.visualVersion, layout: bootstrap.layout, eccId: 1, mask: bootstrap.mask, orientation: ORIENTATION_BITS.slice(), bootstrap: bootstrapBits, dataRings },
     rotation: best.phase + Math.PI / 2,
     mirrored: best.mirrored,
     confidence,

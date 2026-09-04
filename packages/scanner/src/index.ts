@@ -1,11 +1,12 @@
 import { decodeSampledSymbol } from "@qccode/decoder";
-import { verifyEnvelopeOffline, type QCCodeTrustStore, type OfflineVerificationResult } from "@qccode/security";
+import { verifyBearerEnvelope, verifyEnvelopeOffline, type BearerVerificationResult, type QCCodeTrustStore, type OfflineVerificationResult } from "@qccode/security";
+import { isBearerEnvelope } from "@qccode/protocol";
 import { decodeImageData, type VisionDecodeResult } from "@qccode/vision";
 
 export type QCCodeScanResult = {
   visual: VisionDecodeResult;
   decoded: ReturnType<typeof decodeSampledSymbol>;
-  security: OfflineVerificationResult;
+  security: OfflineVerificationResult | BearerVerificationResult;
 };
 
 export class QCCodeScanner {
@@ -16,7 +17,9 @@ export class QCCodeScanner {
   async scanImageData(image: ImageData): Promise<QCCodeScanResult> {
     const visual = decodeImageData(image);
     const decoded = decodeSampledSymbol(visual.symbol, visual.unknownPhysicalSlots);
-    const security = await verifyEnvelopeOffline(decoded.envelopeBytes, this.trustStore);
+    const security = isBearerEnvelope(decoded.envelopeBytes)
+      ? verifyBearerEnvelope(decoded.envelopeBytes)
+      : await verifyEnvelopeOffline(decoded.envelopeBytes, this.trustStore);
     return { visual, decoded, security };
   }
 
