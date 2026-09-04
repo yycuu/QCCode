@@ -44,5 +44,6 @@
   "dependencies": {
     "@qccode/protocol": "workspace:*",
     "@qccode/security": "workspace:*"
-  }
+  },
+  "license": "MIT"
 }

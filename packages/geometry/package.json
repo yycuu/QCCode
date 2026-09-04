@@ -39,5 +39,6 @@
   },
   "scripts": {
     "build": "tsc -b"
-  }
+  },
+  "license": "MIT"
 }

@@ -44,5 +44,6 @@
     "@qccode/decoder": "workspace:*",
     "@qccode/security": "workspace:*",
     "@qccode/vision": "workspace:*"
-  }
+  },
+  "license": "MIT"
 }

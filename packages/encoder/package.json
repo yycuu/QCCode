@@ -44,5 +44,6 @@
     "@qccode/core": "workspace:*",
     "@qccode/geometry": "workspace:*",
     "@qccode/protocol": "workspace:*"
-  }
+  },
+  "license": "MIT"
 }

@@ -42,5 +42,6 @@
   },
   "dependencies": {
     "@qccode/protocol": "workspace:*"
-  }
+  },
+  "license": "MIT"
 }

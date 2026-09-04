@@ -42,5 +42,6 @@
   },
   "dependencies": {
     "@qccode/geometry": "workspace:*"
-  }
+  },
+  "license": "MIT"
 }

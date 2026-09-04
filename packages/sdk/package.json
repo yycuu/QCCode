@@ -49,5 +49,6 @@
     "@qccode/renderer-svg": "workspace:*",
     "@qccode/scanner": "workspace:*",
     "@qccode/security": "workspace:*"
-  }
+  },
+  "license": "MIT"
 }
