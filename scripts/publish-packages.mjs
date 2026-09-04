@@ -40,7 +40,6 @@ function isPublished(name, version) {
     `${name}@${version}`,
     "version",
     "--registry=https://registry.npmjs.org/",
-    "--silent",
   ], { cwd: root, encoding: "utf8", stdio: "pipe" });
   if (result.status === 0) return result.stdout.trim() === version;
   if (result.stderr.includes("E404")) return false;
