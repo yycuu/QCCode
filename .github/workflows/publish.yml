@@ -24,8 +24,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
-        with:
-          ref: ${{ inputs.tag || github.ref }}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
