@@ -239,7 +239,7 @@ pnpm release:npm
 
 ## 配置 GitHub OIDC 自动发布
 
-仓库提供 `.github/workflows/publish.yml`。它在 GitHub Release 发布时运行，并要求 tag 为 `v<version>`，例如 `v0.1.0`。
+仓库提供 `.github/workflows/publish.yml`。推送完整 SemVer tag 时它会自动运行，并要求 tag 为 `v<version>`，例如 `v0.1.0`。`v1` 这类缩写不会触发发布。
 
 首次发布各包后，在 npmjs.com 的每个 `@qccode/*` package 设置中添加 Trusted Publisher：
 
@@ -259,9 +259,9 @@ Allowed action:    npm publish
 2. 运行 `pnpm install` 更新 lockfile。
 3. 执行 `pnpm build && pnpm test && pnpm pack:npm`。
 4. 提交版本变更并推送。
-5. 创建同版本 tag，例如 `v0.1.1`。
-6. 在 GitHub 发布该 tag 对应的 Release。
-7. 等待 `Publish npm packages` workflow 完成。
+5. 创建并推送同版本 tag，例如 `git tag v0.1.1 && git push origin v0.1.1`。
+6. 等待 `Publish npm packages` workflow 完成。
+7. 可在发布成功后创建对应的 GitHub Release 和 release notes。
 
 ## 安装失败排查
 
