@@ -1,8 +1,22 @@
-# CircleCode
+# QCCode
 
-CircleCode is an independent circular visual-code protocol built around concentric rings and four-level luminance arc slots. It combines a deterministic binary envelope, Ed25519 signatures, CRC-32C, Reed–Solomon error correction, interleaving, and rotation-independent orientation recovery.
+QCCode is an independent circular visual-code protocol built around concentric rings and four-level luminance arc slots. It combines a deterministic binary envelope, Ed25519 signatures, CRC-32C, Reed–Solomon error correction, interleaving, and rotation-independent orientation recovery.
 
 The server is the only component that signs messages. Display clients receive an already-signed envelope and only perform visual encoding.
+
+## Install
+
+```bash
+npm install @qccode/sdk
+```
+
+Server applications can install the smaller server entry point:
+
+```bash
+npm install @qccode/server-sdk
+```
+
+See the [npm integration guide](docs/npm-integration.md) for browser, server, trust-store, publishing, and release configuration.
 
 ## Development
 

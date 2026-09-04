@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  CircleCodeFlag,
-  CircleCodeMode,
+  QCCodeFlag,
+  QCCodeMode,
   encodeReferencePayload,
   encodeSignedBytes,
   parseEnvelope,
@@ -19,8 +19,8 @@ const publicKey = hex("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f
 const issuerId = Uint8Array.from({ length: 16 }, (_, index) => index + 1);
 
 const input = {
-  mode: CircleCodeMode.REFERENCE,
-  flags: CircleCodeFlag.SERVER_RESOLUTION_REQUIRED | CircleCodeFlag.SINGLE_USE,
+  mode: QCCodeMode.REFERENCE,
+  flags: QCCodeFlag.SERVER_RESOLUTION_REQUIRED | QCCodeFlag.SINGLE_USE,
   issuerId,
   keyId: 27,
   messageType: 7,

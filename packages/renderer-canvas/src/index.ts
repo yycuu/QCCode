@@ -1,4 +1,4 @@
-import type { CircleCodeSymbol } from "@circlecode/geometry";
+import type { QCCodeSymbol } from "@qccode/geometry";
 
 export type CanvasRenderOptions = {
   size?: number;
@@ -45,7 +45,7 @@ function drawRadialMarkers(ctx: CanvasRenderingContext2D, bits: ArrayLike<number
   }
 }
 
-export function renderCanvas(symbol: CircleCodeSymbol, canvas: HTMLCanvasElement | OffscreenCanvas, options: CanvasRenderOptions = {}): void {
+export function renderCanvas(symbol: QCCodeSymbol, canvas: HTMLCanvasElement | OffscreenCanvas, options: CanvasRenderOptions = {}): void {
   const size = options.size ?? 512;
   const foreground = options.foreground ?? "#000000";
   const background = options.background ?? "#FFFFFF";

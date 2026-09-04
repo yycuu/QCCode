@@ -1,15 +1,49 @@
 {
-  "name": "@circlecode/encoder",
+  "name": "@qccode/encoder",
   "version": "0.1.0",
-  "private": true,
+  "description": "Encode signed QCCode envelopes into circular visual symbols.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
-  "scripts": { "build": "tsc -b" }
-  ,"dependencies": {
-    "@circlecode/core": "workspace:*",
-    "@circlecode/geometry": "workspace:*",
-    "@circlecode/protocol": "workspace:*"
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yycuu/QCCode.git",
+    "directory": "packages/encoder"
+  },
+  "homepage": "https://github.com/yycuu/QCCode#readme",
+  "bugs": {
+    "url": "https://github.com/yycuu/QCCode/issues"
+  },
+  "keywords": [
+    "qccode",
+    "visual-code",
+    "barcode",
+    "ed25519"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@qccode/core": "workspace:*",
+    "@qccode/geometry": "workspace:*",
+    "@qccode/protocol": "workspace:*"
   }
 }

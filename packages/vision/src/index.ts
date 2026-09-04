@@ -1,6 +1,6 @@
-import { decodeBootstrap, LAYOUTS, ORIENTATION_BITS, type CircleCodeSymbol } from "@circlecode/geometry";
+import { decodeBootstrap, LAYOUTS, ORIENTATION_BITS, type QCCodeSymbol } from "@qccode/geometry";
 
-export type VisionDecodeResult = { symbol: CircleCodeSymbol; rotation: number; mirrored: boolean; confidence: number; unknownPhysicalSlots: number[] };
+export type VisionDecodeResult = { symbol: QCCodeSymbol; rotation: number; mirrored: boolean; confidence: number; unknownPhysicalSlots: number[] };
 
 function grayscale(image: ImageData): Uint8Array {
   const result = new Uint8Array(image.width * image.height);

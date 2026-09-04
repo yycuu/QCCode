@@ -1,17 +1,17 @@
-export const ENVELOPE_MAGIC = new Uint8Array([0xc7, 0x43, 0x43, 0x01]);
+export const ENVELOPE_MAGIC = new Uint8Array([0xc7, 0x51, 0x43, 0x01]);
 export const PROTOCOL_VERSION_V1 = 0x10;
 export const ED25519_ALGORITHM = 0x01;
 export const ENVELOPE_FIXED_PREFIX_BYTES = 81;
 export const ED25519_SIGNATURE_BYTES = 64;
 export const ENVELOPE_OVERHEAD_BYTES = 145;
 
-export enum CircleCodeMode {
+export enum QCCodeMode {
   INLINE = 0x01,
   REFERENCE = 0x02,
   CHALLENGE = 0x03,
 }
 
-export enum CircleCodeFlag {
+export enum QCCodeFlag {
   SINGLE_USE = 1 << 0,
   SERVER_RESOLUTION_REQUIRED = 1 << 1,
   USER_CONFIRMATION_REQUIRED = 1 << 2,
@@ -22,7 +22,7 @@ export const V1_KNOWN_FLAGS = 0x000f;
 
 export type EnvelopeUnsignedV1 = {
   version?: number;
-  mode: CircleCodeMode;
+  mode: QCCodeMode;
   flags: number;
   issuerId: Uint8Array;
   keyId: number;
@@ -41,7 +41,7 @@ export type EnvelopeV1 = Required<EnvelopeUnsignedV1> & {
   bytes: Uint8Array;
 };
 
-export class CircleCodeProtocolError extends Error {
+export class QCCodeProtocolError extends Error {
   constructor(
     public readonly code:
       | "PROTOCOL_INVALID"
@@ -50,19 +50,19 @@ export class CircleCodeProtocolError extends Error {
     message: string,
   ) {
     super(message);
-    this.name = "CircleCodeProtocolError";
+    this.name = "QCCodeProtocolError";
   }
 }
 
 function requireLength(name: string, value: Uint8Array, length: number): void {
   if (value.length !== length) {
-    throw new CircleCodeProtocolError("PROTOCOL_INVALID", `${name} must be ${length} bytes`);
+    throw new QCCodeProtocolError("PROTOCOL_INVALID", `${name} must be ${length} bytes`);
   }
 }
 
 function requireUint(name: string, value: number, max: number): void {
   if (!Number.isInteger(value) || value < 0 || value > max) {
-    throw new CircleCodeProtocolError("PROTOCOL_INVALID", `${name} is out of range`);
+    throw new QCCodeProtocolError("PROTOCOL_INVALID", `${name} is out of range`);
   }
 }
 
@@ -70,23 +70,23 @@ export function validateUnsignedEnvelope(input: EnvelopeUnsignedV1): void {
   const version = input.version ?? PROTOCOL_VERSION_V1;
   const algorithm = input.signatureAlgorithm ?? ED25519_ALGORITHM;
   if (version !== PROTOCOL_VERSION_V1) {
-    throw new CircleCodeProtocolError("UNSUPPORTED_VERSION", `unsupported version 0x${version.toString(16)}`);
+    throw new QCCodeProtocolError("UNSUPPORTED_VERSION", `unsupported version 0x${version.toString(16)}`);
   }
-  if (!Object.values(CircleCodeMode).includes(input.mode)) {
-    throw new CircleCodeProtocolError("PROTOCOL_INVALID", "invalid mode");
+  if (!Object.values(QCCodeMode).includes(input.mode)) {
+    throw new QCCodeProtocolError("PROTOCOL_INVALID", "invalid mode");
   }
   if ((input.flags & ~V1_KNOWN_FLAGS) !== 0) {
-    throw new CircleCodeProtocolError("UNSUPPORTED_FLAGS", "reserved flags must be zero");
+    throw new QCCodeProtocolError("UNSUPPORTED_FLAGS", "reserved flags must be zero");
   }
-  if (input.mode === CircleCodeMode.REFERENCE && !(input.flags & CircleCodeFlag.SERVER_RESOLUTION_REQUIRED)) {
-    throw new CircleCodeProtocolError("PROTOCOL_INVALID", "REFERENCE requires server resolution");
+  if (input.mode === QCCodeMode.REFERENCE && !(input.flags & QCCodeFlag.SERVER_RESOLUTION_REQUIRED)) {
+    throw new QCCodeProtocolError("PROTOCOL_INVALID", "REFERENCE requires server resolution");
   }
-  const challengeFlags = CircleCodeFlag.SINGLE_USE | CircleCodeFlag.SERVER_RESOLUTION_REQUIRED | CircleCodeFlag.USER_CONFIRMATION_REQUIRED;
-  if (input.mode === CircleCodeMode.CHALLENGE && (input.flags & challengeFlags) !== challengeFlags) {
-    throw new CircleCodeProtocolError("PROTOCOL_INVALID", "CHALLENGE requires single-use, server resolution, and confirmation");
+  const challengeFlags = QCCodeFlag.SINGLE_USE | QCCodeFlag.SERVER_RESOLUTION_REQUIRED | QCCodeFlag.USER_CONFIRMATION_REQUIRED;
+  if (input.mode === QCCodeMode.CHALLENGE && (input.flags & challengeFlags) !== challengeFlags) {
+    throw new QCCodeProtocolError("PROTOCOL_INVALID", "CHALLENGE requires single-use, server resolution, and confirmation");
   }
   if (algorithm !== ED25519_ALGORITHM) {
-    throw new CircleCodeProtocolError("PROTOCOL_INVALID", "unsupported signature algorithm");
+    throw new QCCodeProtocolError("PROTOCOL_INVALID", "unsupported signature algorithm");
   }
   requireLength("issuerId", input.issuerId, 16);
   requireLength("messageId", input.messageId, 16);
@@ -94,16 +94,16 @@ export function validateUnsignedEnvelope(input: EnvelopeUnsignedV1): void {
   requireUint("keyId", input.keyId, 0xffff_ffff);
   requireUint("messageType", input.messageType, 0xffff);
   if (input.payload.length > 0xffff) {
-    throw new CircleCodeProtocolError("PROTOCOL_INVALID", "payload is too large");
+    throw new QCCodeProtocolError("PROTOCOL_INVALID", "payload is too large");
   }
   if (input.issuedAt < 0n || input.issuedAt > 0xffff_ffff_ffff_ffffn || input.expiresAt <= input.issuedAt || input.expiresAt > 0xffff_ffff_ffff_ffffn) {
-    throw new CircleCodeProtocolError("PROTOCOL_INVALID", "invalid validity interval");
+    throw new QCCodeProtocolError("PROTOCOL_INVALID", "invalid validity interval");
   }
-  if (input.mode === CircleCodeMode.REFERENCE && input.payload.length !== 18) {
-    throw new CircleCodeProtocolError("PROTOCOL_INVALID", "REFERENCE payload must be 18 bytes");
+  if (input.mode === QCCodeMode.REFERENCE && input.payload.length !== 18) {
+    throw new QCCodeProtocolError("PROTOCOL_INVALID", "REFERENCE payload must be 18 bytes");
   }
-  if (input.mode === CircleCodeMode.CHALLENGE && input.payload.length !== 50) {
-    throw new CircleCodeProtocolError("PROTOCOL_INVALID", "CHALLENGE payload must be 50 bytes");
+  if (input.mode === QCCodeMode.CHALLENGE && input.payload.length !== 50) {
+    throw new QCCodeProtocolError("PROTOCOL_INVALID", "CHALLENGE payload must be 50 bytes");
   }
 }
 
@@ -144,17 +144,17 @@ function equalAt(bytes: Uint8Array, expected: Uint8Array, offset: number): boole
 
 export function parseEnvelope(bytes: Uint8Array): EnvelopeV1 {
   if (bytes.length < ENVELOPE_OVERHEAD_BYTES || !equalAt(bytes, ENVELOPE_MAGIC, 0)) {
-    throw new CircleCodeProtocolError("PROTOCOL_INVALID", "invalid envelope magic or length");
+    throw new QCCodeProtocolError("PROTOCOL_INVALID", "invalid envelope magic or length");
   }
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const payloadLength = view.getUint16(79, false);
   const signedLength = ENVELOPE_FIXED_PREFIX_BYTES + payloadLength;
   if (bytes.length !== signedLength + ED25519_SIGNATURE_BYTES) {
-    throw new CircleCodeProtocolError("PROTOCOL_INVALID", "payload length does not match envelope length");
+    throw new QCCodeProtocolError("PROTOCOL_INVALID", "payload length does not match envelope length");
   }
   const unsigned: Required<EnvelopeUnsignedV1> = {
     version: view.getUint8(4),
-    mode: view.getUint8(5) as CircleCodeMode,
+    mode: view.getUint8(5) as QCCodeMode,
     flags: view.getUint16(6, false),
     signatureAlgorithm: view.getUint8(8),
     issuerId: bytes.slice(9, 25),
@@ -208,7 +208,7 @@ export function toBase64Url(bytes: Uint8Array): string {
 }
 
 export function fromBase64Url(value: string): Uint8Array {
-  if (!/^[A-Za-z0-9_-]*$/u.test(value)) throw new CircleCodeProtocolError("PROTOCOL_INVALID", "invalid base64url");
+  if (!/^[A-Za-z0-9_-]*$/u.test(value)) throw new QCCodeProtocolError("PROTOCOL_INVALID", "invalid base64url");
   if (typeof Buffer !== "undefined") return new Uint8Array(Buffer.from(value, "base64url"));
   const padded = value.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
   return Uint8Array.from(atob(padded), (character) => character.charCodeAt(0));

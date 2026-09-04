@@ -1,7 +1,7 @@
 {
   "result": "UNKNOWN_ISSUER",
   "layout": "C1",
-  "mask": 6,
+  "mask": 2,
   "envelopeBytes": 145,
   "visualBits": 2040
 }

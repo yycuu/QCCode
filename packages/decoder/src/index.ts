@@ -1,6 +1,6 @@
-import { bitsToBytes, crc32c, maskSymbol, reedSolomonDecode, RS_DATA_BYTES } from "@circlecode/core";
-import { decodeBootstrap, logicalToPhysicalIndex, physicalIndexToSlot, physicalToLogicalIndex, type CircleCodeSymbol } from "@circlecode/geometry";
-import { equalBytes, parseEnvelope, type EnvelopeV1 } from "@circlecode/protocol";
+import { bitsToBytes, crc32c, maskSymbol, reedSolomonDecode, RS_DATA_BYTES } from "@qccode/core";
+import { decodeBootstrap, logicalToPhysicalIndex, physicalIndexToSlot, physicalToLogicalIndex, type QCCodeSymbol } from "@qccode/geometry";
+import { equalBytes, parseEnvelope, type EnvelopeV1 } from "@qccode/protocol";
 
 export type IdealDecodeResult = {
   envelopeBytes: Uint8Array;
@@ -11,7 +11,7 @@ export type IdealDecodeResult = {
   erasures: number;
 };
 
-function decodeSymbol(symbol: CircleCodeSymbol, unknownPhysicalSlots: readonly number[]): IdealDecodeResult {
+function decodeSymbol(symbol: QCCodeSymbol, unknownPhysicalSlots: readonly number[]): IdealDecodeResult {
   const bootstrap = decodeBootstrap(symbol.bootstrap);
   if (bootstrap.layout.id !== symbol.layout.id || bootstrap.mask !== symbol.mask) throw new Error("BOOTSTRAP_FRAME_MISMATCH");
   if (symbol.dataRings.length !== symbol.layout.ringSlots.length) throw new Error("VISUAL_DECODE_FAILED");
@@ -55,10 +55,10 @@ function decodeSymbol(symbol: CircleCodeSymbol, unknownPhysicalSlots: readonly n
   };
 }
 
-export function decodeIdealSymbol(symbol: CircleCodeSymbol): IdealDecodeResult {
+export function decodeIdealSymbol(symbol: QCCodeSymbol): IdealDecodeResult {
   return decodeSymbol(symbol, []);
 }
 
-export function decodeSampledSymbol(symbol: CircleCodeSymbol, unknownPhysicalSlots: readonly number[]): IdealDecodeResult {
+export function decodeSampledSymbol(symbol: QCCodeSymbol, unknownPhysicalSlots: readonly number[]): IdealDecodeResult {
   return decodeSymbol(symbol, unknownPhysicalSlots);
 }

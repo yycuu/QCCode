@@ -1,7 +1,7 @@
 {
   "result": "UNKNOWN_KEY",
   "layout": "C1",
-  "mask": 3,
+  "mask": 2,
   "envelopeBytes": 145,
   "visualBits": 2040
 }

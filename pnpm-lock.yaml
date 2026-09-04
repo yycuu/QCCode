@@ -23,22 +23,22 @@ importers:
 
   apps/demo:
     dependencies:
-      '@circlecode/encoder':
+      '@qccode/encoder':
         specifier: workspace:*
         version: link:../../packages/encoder
-      '@circlecode/protocol':
+      '@qccode/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
-      '@circlecode/renderer-canvas':
+      '@qccode/renderer-canvas':
         specifier: workspace:*
         version: link:../../packages/renderer-canvas
-      '@circlecode/renderer-svg':
+      '@qccode/renderer-svg':
         specifier: workspace:*
         version: link:../../packages/renderer-svg
-      '@circlecode/scanner':
+      '@qccode/scanner':
         specifier: workspace:*
         version: link:../../packages/scanner
-      '@circlecode/security':
+      '@qccode/security':
         specifier: workspace:*
         version: link:../../packages/security
     devDependencies:
@@ -48,13 +48,13 @@ importers:
 
   apps/reference-server:
     dependencies:
-      '@circlecode/protocol':
+      '@qccode/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
-      '@circlecode/security':
+      '@qccode/security':
         specifier: workspace:*
         version: link:../../packages/security
-      '@circlecode/server-sdk':
+      '@qccode/server-sdk':
         specifier: workspace:*
         version: link:../../packages/server-sdk
       cors:
@@ -81,25 +81,25 @@ importers:
 
   packages/decoder:
     dependencies:
-      '@circlecode/core':
+      '@qccode/core':
         specifier: workspace:*
         version: link:../core
-      '@circlecode/geometry':
+      '@qccode/geometry':
         specifier: workspace:*
         version: link:../geometry
-      '@circlecode/protocol':
+      '@qccode/protocol':
         specifier: workspace:*
         version: link:../protocol
 
   packages/encoder:
     dependencies:
-      '@circlecode/core':
+      '@qccode/core':
         specifier: workspace:*
         version: link:../core
-      '@circlecode/geometry':
+      '@qccode/geometry':
         specifier: workspace:*
         version: link:../geometry
-      '@circlecode/protocol':
+      '@qccode/protocol':
         specifier: workspace:*
         version: link:../protocol
 
@@ -109,70 +109,70 @@ importers:
 
   packages/renderer-canvas:
     dependencies:
-      '@circlecode/geometry':
+      '@qccode/geometry':
         specifier: workspace:*
         version: link:../geometry
 
   packages/renderer-svg:
     dependencies:
-      '@circlecode/geometry':
+      '@qccode/geometry':
         specifier: workspace:*
         version: link:../geometry
 
   packages/scanner:
     dependencies:
-      '@circlecode/decoder':
+      '@qccode/decoder':
         specifier: workspace:*
         version: link:../decoder
-      '@circlecode/security':
+      '@qccode/security':
         specifier: workspace:*
         version: link:../security
-      '@circlecode/vision':
+      '@qccode/vision':
         specifier: workspace:*
         version: link:../vision
 
   packages/sdk:
     dependencies:
-      '@circlecode/decoder':
+      '@qccode/decoder':
         specifier: workspace:*
         version: link:../decoder
-      '@circlecode/encoder':
+      '@qccode/encoder':
         specifier: workspace:*
         version: link:../encoder
-      '@circlecode/protocol':
+      '@qccode/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@circlecode/renderer-canvas':
+      '@qccode/renderer-canvas':
         specifier: workspace:*
         version: link:../renderer-canvas
-      '@circlecode/renderer-svg':
+      '@qccode/renderer-svg':
         specifier: workspace:*
         version: link:../renderer-svg
-      '@circlecode/scanner':
+      '@qccode/scanner':
         specifier: workspace:*
         version: link:../scanner
-      '@circlecode/security':
+      '@qccode/security':
         specifier: workspace:*
         version: link:../security
 
   packages/security:
     dependencies:
-      '@circlecode/protocol':
+      '@qccode/protocol':
         specifier: workspace:*
         version: link:../protocol
 
   packages/server-sdk:
     dependencies:
-      '@circlecode/protocol':
+      '@qccode/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@circlecode/security':
+      '@qccode/security':
         specifier: workspace:*
         version: link:../security
 
   packages/vision:
     dependencies:
-      '@circlecode/geometry':
+      '@qccode/geometry':
         specifier: workspace:*
         version: link:../geometry
 

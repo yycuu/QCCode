@@ -1,7 +1,7 @@
 {
   "result": "SIGNATURE_INVALID",
   "layout": "C1",
-  "mask": 2,
+  "mask": 6,
   "envelopeBytes": 152,
   "visualBits": 2040
 }

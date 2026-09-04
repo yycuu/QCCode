@@ -1,19 +1,53 @@
 {
-  "name": "@circlecode/sdk",
+  "name": "@qccode/sdk",
   "version": "0.1.0",
-  "private": true,
+  "description": "Browser SDK for encoding, rendering, scanning, and verifying QCCode.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
-  "scripts": { "build": "tsc -b" }
-  ,"dependencies": {
-    "@circlecode/decoder": "workspace:*",
-    "@circlecode/encoder": "workspace:*",
-    "@circlecode/protocol": "workspace:*",
-    "@circlecode/renderer-canvas": "workspace:*",
-    "@circlecode/renderer-svg": "workspace:*",
-    "@circlecode/scanner": "workspace:*",
-    "@circlecode/security": "workspace:*"
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yycuu/QCCode.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/yycuu/QCCode#readme",
+  "bugs": {
+    "url": "https://github.com/yycuu/QCCode/issues"
+  },
+  "keywords": [
+    "qccode",
+    "visual-code",
+    "barcode",
+    "ed25519"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@qccode/decoder": "workspace:*",
+    "@qccode/encoder": "workspace:*",
+    "@qccode/protocol": "workspace:*",
+    "@qccode/renderer-canvas": "workspace:*",
+    "@qccode/renderer-svg": "workspace:*",
+    "@qccode/scanner": "workspace:*",
+    "@qccode/security": "workspace:*"
   }
 }

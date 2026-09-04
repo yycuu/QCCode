@@ -1,23 +1,23 @@
-import { bytesToBits, crc32c, maskSymbol, reedSolomonEncode, RS_DATA_BYTES } from "@circlecode/core";
+import { bytesToBits, crc32c, maskSymbol, reedSolomonEncode, RS_DATA_BYTES } from "@qccode/core";
 import {
   encodeBootstrap,
   LAYOUTS,
   logicalToPhysicalIndex,
   ORIENTATION_BITS,
   physicalIndexToSlot,
-  type CircleCodeLayout,
-  type CircleCodeSymbol,
+  type QCCodeLayout,
+  type QCCodeSymbol,
   type LayoutId,
-} from "@circlecode/geometry";
-import { parseEnvelope } from "@circlecode/protocol";
+} from "@qccode/geometry";
+import { parseEnvelope } from "@qccode/protocol";
 
 export type EncodeOptions = { version?: "auto" | LayoutId };
 
-export function maximumEnvelopeBytes(layout: CircleCodeLayout): number {
+export function maximumEnvelopeBytes(layout: QCCodeLayout): number {
   return layout.rsBlocks * RS_DATA_BYTES - 12;
 }
 
-export function selectLayout(envelopeLength: number, requested: "auto" | LayoutId = "auto"): CircleCodeLayout {
+export function selectLayout(envelopeLength: number, requested: "auto" | LayoutId = "auto"): QCCodeLayout {
   if (requested !== "auto") {
     const layout = LAYOUTS[requested];
     if (envelopeLength > maximumEnvelopeBytes(layout)) throw new Error(`envelope does not fit ${requested}`);
@@ -28,7 +28,7 @@ export function selectLayout(envelopeLength: number, requested: "auto" | LayoutI
   return layout;
 }
 
-export function createVisualFrame(envelope: Uint8Array, layout: CircleCodeLayout, mask: number): Uint8Array {
+export function createVisualFrame(envelope: Uint8Array, layout: QCCodeLayout, mask: number): Uint8Array {
   const sourceLength = layout.rsBlocks * RS_DATA_BYTES;
   const frame = new Uint8Array(sourceLength);
   const view = new DataView(frame.buffer);
@@ -44,7 +44,7 @@ export function createVisualFrame(envelope: Uint8Array, layout: CircleCodeLayout
   return frame;
 }
 
-export function encodeVisualCodewords(frame: Uint8Array, layout: CircleCodeLayout): Uint8Array {
+export function encodeVisualCodewords(frame: Uint8Array, layout: QCCodeLayout): Uint8Array {
   const blocks = Array.from({ length: layout.rsBlocks }, () => new Uint8Array(RS_DATA_BYTES));
   for (let index = 0; index < frame.length; index++) blocks[index % layout.rsBlocks]![Math.floor(index / layout.rsBlocks)] = frame[index]!;
   const encoded = blocks.map(reedSolomonEncode);
@@ -53,7 +53,7 @@ export function encodeVisualCodewords(frame: Uint8Array, layout: CircleCodeLayou
   return visual;
 }
 
-function buildDataRings(bits: Uint8Array, layout: CircleCodeLayout, mask: number): Uint8Array[] {
+function buildDataRings(bits: Uint8Array, layout: QCCodeLayout, mask: number): Uint8Array[] {
   const rings = layout.ringSlots.map((count) => new Uint8Array(count));
   if (bits.length !== layout.totalSlots * 2) throw new Error("visual bit count does not match quaternary layout");
   for (let logical = 0; logical < layout.totalSlots; logical++) {
@@ -81,7 +81,7 @@ function ringPenalty(rings: Uint8Array[]): number {
   return penalty;
 }
 
-export function encodeCircleCode(envelope: Uint8Array, options: EncodeOptions = {}): CircleCodeSymbol {
+export function encodeQCCode(envelope: Uint8Array, options: EncodeOptions = {}): QCCodeSymbol {
   parseEnvelope(envelope);
   const layout = selectLayout(envelope.length, options.version ?? "auto");
   let best: { mask: number; rings: Uint8Array[]; penalty: number } | undefined;

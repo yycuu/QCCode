@@ -1,8 +1,8 @@
-# CircleCode V1 Specification
+# QCCode V1 Specification
 
 Status: implementation specification for protocol version 1.0.
 
-CircleCode is an independent circular binary visual-code protocol. It does not use QR, Aztec, Data Matrix, or Apple App Clip Code layouts or wire formats. Normative terms MUST, MUST NOT, SHOULD, and MAY have their RFC 2119 meanings.
+QCCode is an independent circular binary visual-code protocol. It does not use QR, Aztec, Data Matrix, or Apple App Clip Code layouts or wire formats. Normative terms MUST, MUST NOT, SHOULD, and MAY have their RFC 2119 meanings.
 
 ## Architecture and security boundary
 
@@ -18,7 +18,7 @@ All integers are unsigned and big-endian. Byte offsets are zero-based.
 
 | Offset | Size | Field | V1 value or rule |
 |---:|---:|---|---|
-| 0 | 4 | Magic | `C7 43 43 01` |
+| 0 | 4 | Magic | `C7 51 43 01` |
 | 4 | 1 | Version | major in high nibble, minor in low; V1.0 is `10` |
 | 5 | 1 | Mode | INLINE `01`, REFERENCE `02`, CHALLENGE `03` |
 | 6 | 2 | Flags | bitset below |

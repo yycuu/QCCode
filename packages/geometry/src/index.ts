@@ -1,6 +1,6 @@
 export type LayoutId = "C1" | "C2" | "C3";
 
-export type CircleCodeLayout = {
+export type QCCodeLayout = {
   id: LayoutId;
   numericId: 1 | 2 | 3;
   rsBlocks: 1 | 2 | 3;
@@ -11,7 +11,7 @@ export type CircleCodeLayout = {
   centerRadius: number;
 };
 
-export const LAYOUTS: Readonly<Record<LayoutId, CircleCodeLayout>> = {
+export const LAYOUTS: Readonly<Record<LayoutId, QCCodeLayout>> = {
   C1: {
     id: "C1", numericId: 1, rsBlocks: 1,
     ringSlots: [140, 152, 164, 176, 188, 200],
@@ -41,7 +41,7 @@ export const ORIENTATION_BITS = Uint8Array.from(
 
 export type PhysicalSlot = { ring: number; slot: number };
 
-export function physicalIndexToSlot(layout: CircleCodeLayout, physicalIndex: number): PhysicalSlot {
+export function physicalIndexToSlot(layout: QCCodeLayout, physicalIndex: number): PhysicalSlot {
   if (!Number.isInteger(physicalIndex) || physicalIndex < 0 || physicalIndex >= layout.totalSlots) throw new Error("physical index out of range");
   let offset = physicalIndex;
   for (let ring = 0; ring < layout.ringSlots.length; ring++) {
@@ -52,7 +52,7 @@ export function physicalIndexToSlot(layout: CircleCodeLayout, physicalIndex: num
   throw new Error("unreachable physical slot");
 }
 
-export function logicalToPhysicalIndex(layout: CircleCodeLayout, logicalIndex: number): number {
+export function logicalToPhysicalIndex(layout: QCCodeLayout, logicalIndex: number): number {
   return (logicalIndex * layout.permutationMultiplier) % layout.totalSlots;
 }
 
@@ -62,7 +62,7 @@ function extendedGcd(a: number, b: number): [number, number, number] {
   return [gcd, y, x - Math.floor(a / b) * y];
 }
 
-export function physicalToLogicalIndex(layout: CircleCodeLayout, physicalIndex: number): number {
+export function physicalToLogicalIndex(layout: QCCodeLayout, physicalIndex: number): number {
   const [gcd, inverse] = extendedGcd(layout.permutationMultiplier, layout.totalSlots);
   if (gcd !== 1) throw new Error("layout permutation is not invertible");
   return (physicalIndex * ((inverse % layout.totalSlots + layout.totalSlots) % layout.totalSlots)) % layout.totalSlots;
@@ -85,7 +85,7 @@ function popcount32(value: number): number {
   return (((current + (current >>> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24;
 }
 
-export function encodeBootstrap(layout: CircleCodeLayout, mask: number): Uint8Array {
+export function encodeBootstrap(layout: QCCodeLayout, mask: number): Uint8Array {
   if (!Number.isInteger(mask) || mask < 0 || mask > 7) throw new Error("invalid mask");
   const message = (0b10110 << 11) | (layout.numericId << 9) | (0b01 << 7) | (mask << 4);
   const code31 = ((message << 15) ^ bchRemainder(message << 15)) >>> 0;
@@ -96,7 +96,7 @@ export function encodeBootstrap(layout: CircleCodeLayout, mask: number): Uint8Ar
   return result;
 }
 
-export function decodeBootstrap(bits: ArrayLike<number>): { layout: CircleCodeLayout; mask: number; correctedBits: number } {
+export function decodeBootstrap(bits: ArrayLike<number>): { layout: QCCodeLayout; mask: number; correctedBits: number } {
   if (bits.length !== 64) throw new Error("bootstrap ring must contain 64 bits");
   const copies = [0, 32].map((offset) => {
     let received = 0;
@@ -145,9 +145,9 @@ export function recoverOrientation(sampled: ArrayLike<number>): { offset: number
   return { offset: best.offset, mirrored: best.mirrored, confidence, margin };
 }
 
-export type CircleCodeSymbol = {
+export type QCCodeSymbol = {
   visualVersion: 1;
-  layout: CircleCodeLayout;
+  layout: QCCodeLayout;
   eccId: 1;
   mask: number;
   orientation: Uint8Array;

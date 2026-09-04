@@ -1,4 +1,4 @@
-import type { CircleCodeSymbol } from "@circlecode/geometry";
+import type { QCCodeSymbol } from "@qccode/geometry";
 
 export type SvgRenderOptions = {
   size?: number;
@@ -66,7 +66,7 @@ function colorLuminance(color: string): number | null {
   return 0.2126 * channels[0]! + 0.7152 * channels[1]! + 0.0722 * channels[2]!;
 }
 
-export function renderSvg(symbol: CircleCodeSymbol, options: SvgRenderOptions = {}): string {
+export function renderSvg(symbol: QCCodeSymbol, options: SvgRenderOptions = {}): string {
   const size = options.size ?? 512;
   const foreground = options.foreground ?? "#000000";
   const background = options.background ?? "#FFFFFF";
@@ -75,12 +75,12 @@ export function renderSvg(symbol: CircleCodeSymbol, options: SvgRenderOptions = 
   const fgLum = colorLuminance(foreground), bgLum = colorLuminance(background);
   if (fgLum !== null && bgLum !== null) {
     const ratio = (Math.max(fgLum, bgLum) + 0.05) / (Math.min(fgLum, bgLum) + 0.05);
-    if (ratio < 7) throw new Error(`CircleCode contrast ratio ${ratio.toFixed(2)} is below 7:1`);
+    if (ratio < 7) throw new Error(`QCCode contrast ratio ${ratio.toFixed(2)} is below 7:1`);
   }
   const levelLuminance = levels.map(colorLuminance);
   if (levelLuminance.every((value): value is number => value !== null)) {
     for (let index = 1; index < levelLuminance.length; index++) {
-      if (levelLuminance[index - 1]! <= levelLuminance[index]! || levelLuminance[index - 1]! - levelLuminance[index]! < 0.06) throw new Error("CircleCode levels must have four ordered, distinguishable luminances");
+      if (levelLuminance[index - 1]! <= levelLuminance[index]! || levelLuminance[index - 1]! - levelLuminance[index]! < 0.06) throw new Error("QCCode levels must have four ordered, distinguishable luminances");
     }
   }
   const paths: string[] = [];
@@ -103,6 +103,6 @@ export function renderSvg(symbol: CircleCodeSymbol, options: SvgRenderOptions = 
     const diameter = inner * 2 * scale;
     paths.push(`<image href="${escapeXml(center.imageHref)}" x="${128 - diameter / 2}" y="${128 - diameter / 2}" width="${diameter}" height="${diameter}" preserveAspectRatio="xMidYMid meet"/>`);
   }
-  const title = escapeXml(options.title ?? "CircleCode");
+  const title = escapeXml(options.title ?? "QCCode");
   return `<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${title}" width="${size}" height="${size}" viewBox="0 0 256 256"><title>${title}</title><g fill="${escapeXml(foreground)}">${paths.join("")}</g></svg>`;
 }

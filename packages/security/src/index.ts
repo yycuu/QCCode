@@ -4,35 +4,35 @@ import {
   parseEnvelope,
   type EnvelopeUnsignedV1,
   type EnvelopeV1,
-} from "@circlecode/protocol";
+} from "@qccode/protocol";
 
-export type CircleCodeKeyStatus = "CURRENT" | "PREVIOUS" | "REVOKED";
+export type QCCodeKeyStatus = "CURRENT" | "PREVIOUS" | "REVOKED";
 
-export type CircleCodePublicKeyRecord = {
+export type QCCodePublicKeyRecord = {
   issuerId: Uint8Array;
   keyId: number;
   publicKey: Uint8Array;
-  status: CircleCodeKeyStatus;
+  status: QCCodeKeyStatus;
   notBefore: bigint;
   notAfter: bigint;
 };
 
-export interface CircleCodeTrustStore {
-  getPublicKey(issuerId: Uint8Array, keyId: number): Promise<CircleCodePublicKeyRecord | null>;
+export interface QCCodeTrustStore {
+  getPublicKey(issuerId: Uint8Array, keyId: number): Promise<QCCodePublicKeyRecord | null>;
 }
 
-export class MemoryTrustStore implements CircleCodeTrustStore {
-  readonly #keys = new Map<string, CircleCodePublicKeyRecord>();
+export class MemoryTrustStore implements QCCodeTrustStore {
+  readonly #keys = new Map<string, QCCodePublicKeyRecord>();
 
-  constructor(records: CircleCodePublicKeyRecord[] = []) {
+  constructor(records: QCCodePublicKeyRecord[] = []) {
     for (const record of records) this.add(record);
   }
 
-  add(record: CircleCodePublicKeyRecord): void {
+  add(record: QCCodePublicKeyRecord): void {
     this.#keys.set(keyName(record.issuerId, record.keyId), { ...record, publicKey: record.publicKey.slice(), issuerId: record.issuerId.slice() });
   }
 
-  async getPublicKey(issuerId: Uint8Array, keyId: number): Promise<CircleCodePublicKeyRecord | null> {
+  async getPublicKey(issuerId: Uint8Array, keyId: number): Promise<QCCodePublicKeyRecord | null> {
     return this.#keys.get(keyName(issuerId, keyId)) ?? null;
   }
 }
@@ -95,7 +95,7 @@ export type OfflineVerificationResult = {
   envelope: EnvelopeV1;
   signatureValid: boolean;
   issuerTrusted: boolean;
-  keyStatus: CircleCodeKeyStatus | "UNKNOWN";
+  keyStatus: QCCodeKeyStatus | "UNKNOWN";
   expired: boolean;
   notYetValid: boolean;
   offlineVerified: boolean;
@@ -104,7 +104,7 @@ export type OfflineVerificationResult = {
 
 export async function verifyEnvelopeOffline(
   bytes: Uint8Array,
-  trustStore: CircleCodeTrustStore,
+  trustStore: QCCodeTrustStore,
   options: { now?: bigint; clockSkewSeconds?: bigint } = {},
 ): Promise<OfflineVerificationResult> {
   const envelope = parseEnvelope(bytes);

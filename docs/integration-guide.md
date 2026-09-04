@@ -1,6 +1,6 @@
-# CircleCode V1 完整集成指南
+# QCCode V1 完整集成指南
 
-本文面向需要签发、显示、扫描和兑换 CircleCode 的前端、后端及移动 Web 团队。内容对应当前仓库实现，不以早期设计草案中的示例 API 为准。
+本文面向需要签发、显示、扫描和兑换 QCCode 的前端、后端及移动 Web 团队。内容对应当前仓库实现，不以早期设计草案中的示例 API 为准。
 
 ## 阅读路线
 
@@ -12,7 +12,7 @@
 
 ## 1. 系统边界
 
-CircleCode 的标准数据流是：
+QCCode 的标准数据流是：
 
 ```text
 Server
@@ -22,7 +22,7 @@ Server
   → HTTPS / WebSocket
 Display Client
   → visual encoding only
-  → SVG / Canvas CircleCode
+  → SVG / Canvas QCCode
 Scanner Client
   → visual decode
   → RS + CRC
@@ -50,18 +50,18 @@ Server
 
 | 包 | 用途 |
 |---|---|
-| `@circlecode/protocol` | Envelope 类型、二进制编解码、Payload helper、Base64URL |
-| `@circlecode/security` | Ed25519、Trust Store、离线验证 |
-| `@circlecode/core` | CRC-32C、RS(255,191)、bit、mask |
-| `@circlecode/geometry` | C1/C2/C3、Orientation、Bootstrap、Slot 坐标 |
-| `@circlecode/encoder` | Envelope 到 `CircleCodeSymbol` |
-| `@circlecode/decoder` | 理想 Symbol 和带 erasure Symbol 解码 |
-| `@circlecode/renderer-svg` | SVG 输出、主题和中心 Logo |
-| `@circlecode/renderer-canvas` | Canvas/OffscreenCanvas 输出 |
-| `@circlecode/vision` | ImageData 候选检测、极坐标采样、四级亮度分类 |
-| `@circlecode/scanner` | 图片、Canvas、Video、Camera 扫描与离线验证 |
-| `@circlecode/sdk` | 浏览器常用 API 汇总出口 |
-| `@circlecode/server-sdk` | 签发、资源解析、撤销、Replay Store |
+| `@qccode/protocol` | Envelope 类型、二进制编解码、Payload helper、Base64URL |
+| `@qccode/security` | Ed25519、Trust Store、离线验证 |
+| `@qccode/core` | CRC-32C、RS(255,191)、bit、mask |
+| `@qccode/geometry` | C1/C2/C3、Orientation、Bootstrap、Slot 坐标 |
+| `@qccode/encoder` | Envelope 到 `QCCodeSymbol` |
+| `@qccode/decoder` | 理想 Symbol 和带 erasure Symbol 解码 |
+| `@qccode/renderer-svg` | SVG 输出、主题和中心 Logo |
+| `@qccode/renderer-canvas` | Canvas/OffscreenCanvas 输出 |
+| `@qccode/vision` | ImageData 候选检测、极坐标采样、四级亮度分类 |
+| `@qccode/scanner` | 图片、Canvas、Video、Camera 扫描与离线验证 |
+| `@qccode/sdk` | 浏览器常用 API 汇总出口 |
+| `@qccode/server-sdk` | 签发、资源解析、撤销、Replay Store |
 
 仓库内安装和验证：
 
@@ -161,18 +161,18 @@ CHALLENGE 50-byte payload → 195-byte Envelope → C2
 
 ```ts
 import { writeFile } from "node:fs/promises";
-import { generateEd25519KeyPair } from "@circlecode/security";
-import { toBase64Url } from "@circlecode/protocol";
+import { generateEd25519KeyPair } from "@qccode/security";
+import { toBase64Url } from "@qccode/protocol";
 
 const pair = await generateEd25519KeyPair();
 
-await writeFile("private-keys/circlecode.pk8", pair.privateKeyPkcs8, {
+await writeFile("private-keys/qccode.pk8", pair.privateKeyPkcs8, {
   mode: 0o600,
 });
 
-console.log("CIRCLECODE_PUBLIC_KEY_BASE64URL=", toBase64Url(pair.publicKey));
+console.log("QCCODE_PUBLIC_KEY_BASE64URL=", toBase64Url(pair.publicKey));
 console.log(
-  "CIRCLECODE_ISSUER_ID=",
+  "QCCODE_ISSUER_ID=",
   toBase64Url(crypto.getRandomValues(new Uint8Array(16))),
 );
 ```
@@ -182,20 +182,20 @@ console.log(
 ### 5.2 参考服务器环境变量
 
 ```text
-CIRCLECODE_PRIVATE_KEY_FILE       PKCS#8 DER 文件路径
-CIRCLECODE_PUBLIC_KEY_BASE64URL   对应的 32-byte raw public key
-CIRCLECODE_ISSUER_ID              16-byte Base64URL issuer ID
-CIRCLECODE_KEY_ID                 uint32 十进制 key ID
+QCCODE_PRIVATE_KEY_FILE       PKCS#8 DER 文件路径
+QCCODE_PUBLIC_KEY_BASE64URL   对应的 32-byte raw public key
+QCCODE_ISSUER_ID              16-byte Base64URL issuer ID
+QCCODE_KEY_ID                 uint32 十进制 key ID
 PORT                              默认 8787
 ```
 
 示例：
 
 ```bash
-export CIRCLECODE_PRIVATE_KEY_FILE=/run/secrets/circlecode.pk8
-export CIRCLECODE_PUBLIC_KEY_BASE64URL='...'
-export CIRCLECODE_ISSUER_ID='...'
-export CIRCLECODE_KEY_ID=27
+export QCCODE_PRIVATE_KEY_FILE=/run/secrets/qccode.pk8
+export QCCODE_PUBLIC_KEY_BASE64URL='...'
+export QCCODE_ISSUER_ID='...'
+export QCCODE_KEY_ID=27
 export PORT=8787
 pnpm server
 ```
@@ -210,18 +210,18 @@ pnpm server
 
 ```ts
 import { readFile } from "node:fs/promises";
-import { CircleCodeServer } from "@circlecode/server-sdk";
-import { fromBase64Url } from "@circlecode/protocol";
+import { QCCodeServer } from "@qccode/server-sdk";
+import { fromBase64Url } from "@qccode/protocol";
 
 const now = BigInt(Math.floor(Date.now() / 1000));
 
-const circleCode = new CircleCodeServer({
-  issuerId: fromBase64Url(process.env.CIRCLECODE_ISSUER_ID!),
-  keyId: Number(process.env.CIRCLECODE_KEY_ID),
+const qcCode = new QCCodeServer({
+  issuerId: fromBase64Url(process.env.QCCODE_ISSUER_ID!),
+  keyId: Number(process.env.QCCODE_KEY_ID),
   privateKeyPkcs8: new Uint8Array(
-    await readFile(process.env.CIRCLECODE_PRIVATE_KEY_FILE!),
+    await readFile(process.env.QCCODE_PRIVATE_KEY_FILE!),
   ),
-  publicKey: fromBase64Url(process.env.CIRCLECODE_PUBLIC_KEY_BASE64URL!),
+  publicKey: fromBase64Url(process.env.QCCODE_PUBLIC_KEY_BASE64URL!),
   keyNotBefore: now - 60n,
   keyNotAfter: now + 31_536_000n,
 });
@@ -231,19 +231,19 @@ const circleCode = new CircleCodeServer({
 
 ```ts
 import {
-  CircleCodeMode,
+  QCCodeMode,
   encodeReferencePayload,
-} from "@circlecode/protocol";
+} from "@qccode/protocol";
 
 const resourceId = crypto.getRandomValues(new Uint8Array(16));
 
-circleCode.registerResource(resourceId, {
+qcCode.registerResource(resourceId, {
   action: "open-device",
   deviceId: "display-01",
 });
 
-const issued = await circleCode.issue({
-  mode: CircleCodeMode.REFERENCE,
+const issued = await qcCode.issue({
+  mode: QCCodeMode.REFERENCE,
   messageType: 1001,
   payload: encodeReferencePayload(7, resourceId),
   expiresIn: 300,
@@ -260,9 +260,9 @@ console.log(issued.envelopeBase64Url);
 
 ```ts
 import {
-  CircleCodeMode,
+  QCCodeMode,
   encodeChallengePayload,
-} from "@circlecode/protocol";
+} from "@qccode/protocol";
 
 const challengeId = crypto.getRandomValues(new Uint8Array(16));
 const context = new TextEncoder().encode(
@@ -272,8 +272,8 @@ const contextHash = new Uint8Array(
   await crypto.subtle.digest("SHA-256", context),
 );
 
-const issued = await circleCode.issue({
-  mode: CircleCodeMode.CHALLENGE,
+const issued = await qcCode.issue({
+  mode: QCCodeMode.CHALLENGE,
   messageType: 2001,
   payload: encodeChallengePayload(1, challengeId, contextHash),
   expiresIn: 90,
@@ -285,10 +285,10 @@ const issued = await circleCode.issue({
 ### 6.4 INLINE
 
 ```ts
-import { CircleCodeMode } from "@circlecode/protocol";
+import { QCCodeMode } from "@qccode/protocol";
 
-const issued = await circleCode.issue({
-  mode: CircleCodeMode.INLINE,
+const issued = await qcCode.issue({
+  mode: QCCodeMode.INLINE,
   messageType: 3001,
   payload: new TextEncoder().encode("public-device-label"),
   expiresIn: 3600,
@@ -302,12 +302,12 @@ const issued = await circleCode.issue({
 
 参考服务器需要由调用方在生产环境外加认证、授权、限流和审计。
 
-### 7.1 `POST /circlecode/v1/issue`
+### 7.1 `POST /qccode/v1/issue`
 
 REFERENCE 请求：
 
 ```http
-POST /circlecode/v1/issue
+POST /qccode/v1/issue
 Content-Type: application/json
 
 {
@@ -362,7 +362,7 @@ INLINE 请求：
 
 Display Client 必须原样使用 `envelopeBase64Url`，不能解析后重建 Envelope。
 
-### 7.2 `GET /circlecode/v1/keys`
+### 7.2 `GET /qccode/v1/keys`
 
 响应：
 
@@ -384,10 +384,10 @@ Display Client 必须原样使用 `envelopeBase64Url`，不能解析后重建 En
 
 通过 HTTPS 下载 key set 并不自动表示信任该 issuer。应用必须通过预置 issuer、固定公钥根、MDM 配置或其他可信引导决定哪些 issuer 可以加入 Trust Store。
 
-### 7.3 `POST /circlecode/v1/redeem`
+### 7.3 `POST /qccode/v1/redeem`
 
 ```http
-POST /circlecode/v1/redeem
+POST /qccode/v1/redeem
 Content-Type: application/json
 
 {
@@ -419,7 +419,7 @@ SERVER_REJECTED
 
 当前参考服务器对非 ACCEPTED 返回 HTTP 400。接入端应同时检查 HTTP status 和 JSON `status`。
 
-### 7.4 `POST /circlecode/v1/resolve`
+### 7.4 `POST /qccode/v1/resolve`
 
 请求格式与 redeem 相同。当前参考实现复用同一验证和处理路径。生产系统通常会让 REFERENCE resolve 与敏感 CHALLENGE redeem 使用不同权限、审计及业务 handler。
 
@@ -440,7 +440,7 @@ SERVER_REJECTED
 连接：
 
 ```text
-ws://localhost:8787/circlecode/v1/ws
+ws://localhost:8787/qccode/v1/ws
 ```
 
 生产环境必须使用 `wss://`。
@@ -449,7 +449,7 @@ ws://localhost:8787/circlecode/v1/ws
 
 ```json
 {
-  "type": "circlecode.envelope",
+  "type": "qccode.envelope",
   "sequence": 1788517492000,
   "envelope": "base64url"
 }
@@ -458,11 +458,11 @@ ws://localhost:8787/circlecode/v1/ws
 Display Client：
 
 ```ts
-const socket = new WebSocket("wss://issuer.example/circlecode/v1/ws");
+const socket = new WebSocket("wss://issuer.example/qccode/v1/ws");
 
 socket.addEventListener("message", (event) => {
   const message = JSON.parse(String(event.data));
-  if (message.type !== "circlecode.envelope") return;
+  if (message.type !== "qccode.envelope") return;
   displayEnvelope(message.envelope);
 });
 ```
@@ -473,25 +473,25 @@ socket.addEventListener("message", (event) => {
 
 ```ts
 import {
-  encodeCircleCode,
+  encodeQCCode,
   fromBase64Url,
   renderSvg,
-} from "@circlecode/sdk";
+} from "@qccode/sdk";
 
 function displayEnvelope(envelopeBase64Url: string): void {
   const envelopeBytes = fromBase64Url(envelopeBase64Url);
-  const symbol = encodeCircleCode(envelopeBytes, { version: "auto" });
+  const symbol = encodeQCCode(envelopeBytes, { version: "auto" });
 
   const svg = renderSvg(symbol, {
     size: 560,
     foreground: "#000000",
     background: "#FFFFFF",
     dataBackground: "#F1F3F2",
-    title: "Signed CircleCode",
+    title: "Signed QCCode",
     center: { mode: "none" },
   });
 
-  document.querySelector("#circlecode")!.innerHTML = svg;
+  document.querySelector("#qccode")!.innerHTML = svg;
 }
 ```
 
@@ -547,13 +547,13 @@ renderSvg(symbol, {
 
 ```ts
 import {
-  encodeCircleCode,
+  encodeQCCode,
   fromBase64Url,
   renderCanvas,
-} from "@circlecode/sdk";
+} from "@qccode/sdk";
 
-const canvas = document.querySelector<HTMLCanvasElement>("#circlecode-canvas")!;
-const symbol = encodeCircleCode(fromBase64Url(envelopeBase64Url));
+const canvas = document.querySelector<HTMLCanvasElement>("#qccode-canvas")!;
+const symbol = encodeQCCode(fromBase64Url(envelopeBase64Url));
 
 renderCanvas(symbol, canvas, {
   size: 768,
@@ -591,7 +591,7 @@ Renderer 会把 Logo 裁剪到中心圆形安全区。Canvas 用于相机扫描�
 import {
   MemoryTrustStore,
   fromBase64Url,
-} from "@circlecode/sdk";
+} from "@qccode/sdk";
 
 const trustStore = new MemoryTrustStore([
   {
@@ -608,7 +608,7 @@ const trustStore = new MemoryTrustStore([
 从已受信 endpoint 更新：
 
 ```ts
-const response = await fetch("https://issuer.example/circlecode/v1/keys");
+const response = await fetch("https://issuer.example/qccode/v1/keys");
 const body = await response.json();
 const issuerId = fromBase64Url(body.issuerId);
 
@@ -631,9 +631,9 @@ for (const key of body.keys) {
 ## 12. 扫描图片和 Canvas
 
 ```ts
-import { CircleCodeScanner } from "@circlecode/sdk";
+import { QCCodeScanner } from "@qccode/sdk";
 
-const scanner = new CircleCodeScanner(trustStore);
+const scanner = new QCCodeScanner(trustStore);
 const result = await scanner.scanCanvas(canvas);
 
 console.log(result.visual.confidence);
@@ -726,7 +726,7 @@ navigator.mediaDevices.getUserMedia({
 如果视觉层之外已经取得 Envelope bytes，可以直接验签：
 
 ```ts
-import { verifyEnvelopeOffline } from "@circlecode/security";
+import { verifyEnvelopeOffline } from "@qccode/security";
 
 const verification = await verifyEnvelopeOffline(
   envelopeBytes,
@@ -783,15 +783,15 @@ Server status             ACCEPTED / REPLAYED / REVOKED / ...
 ```ts
 import {
   toBase64Url,
-  type CircleCodeScanResult,
-} from "@circlecode/sdk";
+  type QCCodeScanResult,
+} from "@qccode/sdk";
 
-async function submit(result: CircleCodeScanResult) {
+async function submit(result: QCCodeScanResult) {
   if (!result.security.signatureValid || !result.security.issuerTrusted) {
-    throw new Error("CircleCode is not locally trusted");
+    throw new Error("QCCode is not locally trusted");
   }
 
-  const response = await fetch("https://issuer.example/circlecode/v1/redeem", {
+  const response = await fetch("https://issuer.example/qccode/v1/redeem", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -823,7 +823,7 @@ async function submit(result: CircleCodeScanResult) {
 生产表结构示例：
 
 ```sql
-CREATE TABLE circlecode_redemptions (
+CREATE TABLE qccode_redemptions (
   issuer_id  BYTEA       NOT NULL,
   message_id BYTEA       NOT NULL,
   nonce      BYTEA       NOT NULL,
@@ -866,8 +866,8 @@ Redis 可以用 `SET key value NX EX ttl` 或 Lua script 原子占位，但占�
 Server SDK Demo：
 
 ```ts
-const envelope = circleCode.parse(envelopeBase64Url);
-circleCode.revoke(envelope.messageId);
+const envelope = qcCode.parse(envelopeBase64Url);
+qcCode.revoke(envelope.messageId);
 ```
 
 签名有效的码仍可能被服务器撤销。生产系统应持久化以下业务状态：
@@ -928,7 +928,7 @@ REVOKED
 SERVER_REJECTED
 ```
 
-当前部分内部错误以 `Error.message` 表达；`CircleCodeProtocolError` 提供结构化 `code`。应用集成层应把底层异常映射到稳定的产品错误枚举，不要把内部 stack trace 返回给终端用户。
+当前部分内部错误以 `Error.message` 表达；`QCCodeProtocolError` 提供结构化 `code`。应用集成层应把底层异常映射到稳定的产品错误枚举，不要把内部 stack trace 返回给终端用户。
 
 建议重试策略：
 
@@ -1053,7 +1053,7 @@ pnpm test
 
 ## 25. 当前视觉识别边界
 
-当前 `@circlecode/vision` 是可运行的浏览器基线，已支持：
+当前 `@qccode/vision` 是可运行的浏览器基线，已支持：
 
 - `ImageData`、Canvas、Video frame。
 - 环形候选边界。
@@ -1091,9 +1091,9 @@ False positive 的代价高于扫不到。低置信度候选必须拒绝，不�
 3. 部署 key endpoint。
 4. 在 Scanner 中建立可信 issuer 引导。
 5. 实现持久化 Resource、Revocation 和 Replay Store。
-6. 只在服务端调用 `circleCode.issue()`。
+6. 只在服务端调用 `qcCode.issue()`。
 7. 通过 HTTPS/WSS 向 Display Client 发送 Signed Envelope。
-8. Display Client 调用 `encodeCircleCode()` 和 Renderer。
+8. Display Client 调用 `encodeQCCode()` 和 Renderer。
 9. Scanner 完成视觉解码和离线验签。
 10. UI 分别显示视觉、签名、信任和时间结果。
 11. 用户确认后提交原始 Envelope。

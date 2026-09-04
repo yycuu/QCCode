@@ -1,17 +1,17 @@
 import {
-  CircleCodeFlag,
-  CircleCodeMode,
+  QCCodeFlag,
+  QCCodeMode,
   fromBase64Url,
   parseEnvelope,
   toBase64Url,
   type EnvelopeUnsignedV1,
-} from "@circlecode/protocol";
+} from "@qccode/protocol";
 import {
   MemoryTrustStore,
   issueEnvelope,
   verifyEnvelopeOffline,
-  type CircleCodePublicKeyRecord,
-} from "@circlecode/security";
+  type QCCodePublicKeyRecord,
+} from "@qccode/security";
 
 export type RedeemStatus = "ACCEPTED" | "REPLAYED" | "EXPIRED" | "REVOKED" | "INVALID" | "SERVER_REJECTED";
 
@@ -54,7 +54,7 @@ export type IssuerConfiguration = {
   keyNotAfter: bigint;
 };
 
-export class CircleCodeServer {
+export class QCCodeServer {
   readonly trustStore: MemoryTrustStore;
   readonly #revokedMessages = new Set<string>();
   readonly #resources = new Map<string, unknown>();
@@ -63,12 +63,12 @@ export class CircleCodeServer {
     this.trustStore = new MemoryTrustStore([this.keyRecord]);
   }
 
-  get keyRecord(): CircleCodePublicKeyRecord {
+  get keyRecord(): QCCodePublicKeyRecord {
     return { issuerId: this.issuer.issuerId, keyId: this.issuer.keyId, publicKey: this.issuer.publicKey, status: "CURRENT", notBefore: this.issuer.keyNotBefore, notAfter: this.issuer.keyNotAfter };
   }
 
   async issue(input: {
-    mode: CircleCodeMode;
+    mode: QCCodeMode;
     messageType: number;
     payload: Uint8Array;
     expiresIn: number;
@@ -78,9 +78,9 @@ export class CircleCodeServer {
   }): Promise<{ envelope: Uint8Array; envelopeBase64Url: string }> {
     if (!Number.isInteger(input.expiresIn) || input.expiresIn < 1 || input.expiresIn > 86_400) throw new Error("expiresIn must be 1..86400 seconds");
     const now = input.now ?? BigInt(Math.floor(Date.now() / 1000));
-    let flags = input.singleUse || input.mode === CircleCodeMode.CHALLENGE ? CircleCodeFlag.SINGLE_USE : 0;
-    if (input.mode !== CircleCodeMode.INLINE) flags |= CircleCodeFlag.SERVER_RESOLUTION_REQUIRED;
-    if (input.requireConfirmation || input.mode === CircleCodeMode.CHALLENGE) flags |= CircleCodeFlag.USER_CONFIRMATION_REQUIRED;
+    let flags = input.singleUse || input.mode === QCCodeMode.CHALLENGE ? QCCodeFlag.SINGLE_USE : 0;
+    if (input.mode !== QCCodeMode.INLINE) flags |= QCCodeFlag.SERVER_RESOLUTION_REQUIRED;
+    if (input.requireConfirmation || input.mode === QCCodeMode.CHALLENGE) flags |= QCCodeFlag.USER_CONFIRMATION_REQUIRED;
     const unsigned: EnvelopeUnsignedV1 = {
       mode: input.mode,
       flags,
@@ -115,10 +115,10 @@ export class CircleCodeServer {
       const envelope = verified.envelope;
       if (this.#revokedMessages.has(id(envelope.messageId))) return { status: "REVOKED" };
       const operation = async (): Promise<unknown> => {
-        if (envelope.mode === CircleCodeMode.REFERENCE) return this.#resources.get(id(envelope.payload.slice(2))) ?? null;
-        return { mode: CircleCodeMode[envelope.mode], messageType: envelope.messageType, payload: toBase64Url(envelope.payload) };
+        if (envelope.mode === QCCodeMode.REFERENCE) return this.#resources.get(id(envelope.payload.slice(2))) ?? null;
+        return { mode: QCCodeMode[envelope.mode], messageType: envelope.messageType, payload: toBase64Url(envelope.payload) };
       };
-      if (envelope.flags & CircleCodeFlag.SINGLE_USE) {
+      if (envelope.flags & QCCodeFlag.SINGLE_USE) {
         const result = await this.replayStore.redeem(envelope.issuerId, envelope.messageId, envelope.nonce, envelope.expiresAt, operation);
         return result.status === "accepted" ? { status: "ACCEPTED", result: result.result } : { status: result.status === "expired" ? "EXPIRED" : "REPLAYED" };
       }

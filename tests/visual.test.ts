@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { decodeIdealSymbol } from "../packages/decoder/src/index.js";
-import { encodeCircleCode } from "../packages/encoder/src/index.js";
+import { encodeQCCode } from "../packages/encoder/src/index.js";
 import { decodeBootstrap, encodeBootstrap, LAYOUTS, ORIENTATION_BITS, recoverOrientation } from "../packages/geometry/src/index.js";
-import { CircleCodeFlag, CircleCodeMode, equalBytes } from "../packages/protocol/src/index.js";
+import { QCCodeFlag, QCCodeMode, equalBytes } from "../packages/protocol/src/index.js";
 import { issueEnvelope, privateKeyFromSeed } from "../packages/security/src/index.js";
 import { renderSvg } from "../packages/renderer-svg/src/index.js";
 
@@ -11,8 +11,8 @@ const seed = hex("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f
 
 async function inlineEnvelope(payloadLength: number): Promise<Uint8Array> {
   return issueEnvelope({
-    mode: CircleCodeMode.INLINE,
-    flags: CircleCodeFlag.USER_CONFIRMATION_REQUIRED,
+    mode: QCCodeMode.INLINE,
+    flags: QCCodeFlag.USER_CONFIRMATION_REQUIRED,
     issuerId: new Uint8Array(16).fill(1),
     keyId: 1,
     messageType: 1,
@@ -40,7 +40,7 @@ describe("visual protocol", () => {
 
   it.each([[32, "C1"], [50, "C2"], [300, "C3"]] as const)("round trips payload %i through %s", async (payloadLength, expectedLayout) => {
     const envelope = await inlineEnvelope(payloadLength);
-    const symbol = encodeCircleCode(envelope);
+    const symbol = encodeQCCode(envelope);
     expect(symbol.layout.id).toBe(expectedLayout);
     expect(equalBytes(decodeIdealSymbol(symbol).envelopeBytes, envelope)).toBe(true);
     const svg = renderSvg(symbol);

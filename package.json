@@ -1,5 +1,5 @@
 {
-  "name": "circlecode",
+  "name": "qccode",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,9 +8,11 @@
     "build": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev": "pnpm build && pnpm --filter @circlecode/demo dev",
-    "server": "pnpm build && pnpm --filter @circlecode/reference-server dev",
-    "vectors": "tsx scripts/generate-vectors.ts"
+    "dev": "pnpm build && pnpm --filter @qccode/demo dev",
+    "server": "pnpm build && pnpm --filter @qccode/reference-server dev",
+    "vectors": "tsx scripts/generate-vectors.ts",
+    "pack:npm": "node scripts/publish-packages.mjs",
+    "release:npm": "node scripts/publish-packages.mjs --publish"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

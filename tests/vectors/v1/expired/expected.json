@@ -1,7 +1,7 @@
 {
   "result": "EXPIRED",
   "layout": "C1",
-  "mask": 7,
+  "mask": 3,
   "envelopeBytes": 152,
   "visualBits": 2040
 }

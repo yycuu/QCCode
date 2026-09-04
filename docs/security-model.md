@@ -1,6 +1,6 @@
-# CircleCode security model
+# QCCode security model
 
-CircleCode images are public bearer data. Anyone who can see a symbol can copy and decode it. Use REFERENCE for sensitive business data and CHALLENGE with short expiration for authorization.
+QCCode images are public bearer data. Anyone who can see a symbol can copy and decode it. Use REFERENCE for sensitive business data and CHALLENGE with short expiration for authorization.
 
 The server private key is the primary security boundary. Store it outside source control, load it from a protected file or key service, rotate it with explicit key IDs, and publish only public keys. The reference server generates an ephemeral key when no configured key is present; this is convenient for local development and intentionally loses identity on restart.
 

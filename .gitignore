@@ -12,3 +12,4 @@ tests/vectors/v1/**/* [0-9].*
 tests/vectors/v1/* [0-9].*
 .playwright-cli/
 output/
+artifacts/

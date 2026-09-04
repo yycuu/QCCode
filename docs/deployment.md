@@ -3,10 +3,10 @@
 The demo server accepts these environment variables:
 
 ```text
-CIRCLECODE_PRIVATE_KEY_FILE       raw PKCS#8 DER file path
-CIRCLECODE_PUBLIC_KEY_BASE64URL   matching 32-byte raw Ed25519 public key
-CIRCLECODE_ISSUER_ID              16-byte Base64URL issuer ID
-CIRCLECODE_KEY_ID                 unsigned decimal key ID
+QCCODE_PRIVATE_KEY_FILE       raw PKCS#8 DER file path
+QCCODE_PUBLIC_KEY_BASE64URL   matching 32-byte raw Ed25519 public key
+QCCODE_ISSUER_ID              16-byte Base64URL issuer ID
+QCCODE_KEY_ID                 unsigned decimal key ID
 PORT                              HTTP port, default 8787
 ```
 
@@ -19,4 +19,4 @@ pnpm server
 pnpm dev
 ```
 
-The UI is then available from Vite's printed URL. The HTTP server listens on `http://localhost:8787` and WebSocket push uses `/circlecode/v1/ws`.
+The UI is then available from Vite's printed URL. The HTTP server listens on `http://localhost:8787` and WebSocket push uses `/qccode/v1/ws`.

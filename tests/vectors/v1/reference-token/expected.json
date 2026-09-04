@@ -1,7 +1,7 @@
 {
   "result": "VALID",
   "layout": "C1",
-  "mask": 6,
+  "mask": 3,
   "envelopeBytes": 163,
   "visualBits": 2040
 }

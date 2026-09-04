@@ -1,10 +1,10 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { bytesToBits } from "../packages/core/src/index.js";
-import { createVisualFrame, encodeCircleCode, encodeVisualCodewords } from "../packages/encoder/src/index.js";
+import { createVisualFrame, encodeQCCode, encodeVisualCodewords } from "../packages/encoder/src/index.js";
 import {
-  CircleCodeFlag,
-  CircleCodeMode,
+  QCCodeFlag,
+  QCCodeMode,
   encodeChallengePayload,
   encodeReferencePayload,
   encodeSignedBytes,
@@ -21,7 +21,7 @@ const seed = fromHex("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031c
 const publicKey = fromHex("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a");
 const privateKey = await privateKeyFromSeed(seed);
 const base = {
-  flags: CircleCodeFlag.USER_CONFIRMATION_REQUIRED,
+  flags: QCCodeFlag.USER_CONFIRMATION_REQUIRED,
   issuerId: fromHex("00112233445566778899aabbccddeeff"),
   keyId: 27,
   messageType: 1001,
@@ -32,15 +32,15 @@ const base = {
 };
 
 const definitions: Array<{ name: string; input: EnvelopeUnsignedV1; mutation?: (bytes: Uint8Array) => void; expected: string }> = [
-  { name: "inline-hello", input: { ...base, mode: CircleCodeMode.INLINE, payload: new TextEncoder().encode("Hello") }, expected: "VALID" },
-  { name: "reference-token", input: { ...base, mode: CircleCodeMode.REFERENCE, flags: CircleCodeFlag.SERVER_RESOLUTION_REQUIRED | CircleCodeFlag.SINGLE_USE, payload: encodeReferencePayload(7, fromHex("0123456789abcdeffedcba9876543210")) }, expected: "VALID" },
-  { name: "challenge-login", input: { ...base, mode: CircleCodeMode.CHALLENGE, flags: CircleCodeFlag.SINGLE_USE | CircleCodeFlag.SERVER_RESOLUTION_REQUIRED | CircleCodeFlag.USER_CONFIRMATION_REQUIRED, payload: encodeChallengePayload(1, fromHex("abcdef0123456789abcdef0123456789"), fromHex("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")) }, expected: "VALID_THEN_REPLAYED" },
-  { name: "expired", input: { ...base, mode: CircleCodeMode.INLINE, issuedAt: 1_600_000_000n, expiresAt: 1_600_000_030n, payload: new TextEncoder().encode("expired") }, expected: "EXPIRED" },
-  { name: "invalid-signature", input: { ...base, mode: CircleCodeMode.INLINE, payload: new TextEncoder().encode("signature") }, mutation: (bytes) => { bytes[bytes.length - 1] = bytes[bytes.length - 1]! ^ 1; }, expected: "SIGNATURE_INVALID" },
-  { name: "modified-payload", input: { ...base, mode: CircleCodeMode.INLINE, payload: new TextEncoder().encode("payload") }, mutation: (bytes) => { bytes[81] = bytes[81]! ^ 1; }, expected: "SIGNATURE_INVALID" },
-  { name: "wrong-issuer", input: { ...base, mode: CircleCodeMode.INLINE, payload: new Uint8Array() }, mutation: (bytes) => { bytes[9] = bytes[9]! ^ 1; }, expected: "UNKNOWN_ISSUER" },
-  { name: "wrong-kid", input: { ...base, mode: CircleCodeMode.INLINE, payload: new Uint8Array() }, mutation: (bytes) => { bytes[28] = bytes[28]! ^ 1; }, expected: "UNKNOWN_KEY" },
-  { name: "replay", input: { ...base, mode: CircleCodeMode.CHALLENGE, flags: 7, payload: encodeChallengePayload(1, new Uint8Array(16).fill(9)) }, expected: "ACCEPTED_THEN_REPLAYED" },
+  { name: "inline-hello", input: { ...base, mode: QCCodeMode.INLINE, payload: new TextEncoder().encode("Hello") }, expected: "VALID" },
+  { name: "reference-token", input: { ...base, mode: QCCodeMode.REFERENCE, flags: QCCodeFlag.SERVER_RESOLUTION_REQUIRED | QCCodeFlag.SINGLE_USE, payload: encodeReferencePayload(7, fromHex("0123456789abcdeffedcba9876543210")) }, expected: "VALID" },
+  { name: "challenge-login", input: { ...base, mode: QCCodeMode.CHALLENGE, flags: QCCodeFlag.SINGLE_USE | QCCodeFlag.SERVER_RESOLUTION_REQUIRED | QCCodeFlag.USER_CONFIRMATION_REQUIRED, payload: encodeChallengePayload(1, fromHex("abcdef0123456789abcdef0123456789"), fromHex("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")) }, expected: "VALID_THEN_REPLAYED" },
+  { name: "expired", input: { ...base, mode: QCCodeMode.INLINE, issuedAt: 1_600_000_000n, expiresAt: 1_600_000_030n, payload: new TextEncoder().encode("expired") }, expected: "EXPIRED" },
+  { name: "invalid-signature", input: { ...base, mode: QCCodeMode.INLINE, payload: new TextEncoder().encode("signature") }, mutation: (bytes) => { bytes[bytes.length - 1] = bytes[bytes.length - 1]! ^ 1; }, expected: "SIGNATURE_INVALID" },
+  { name: "modified-payload", input: { ...base, mode: QCCodeMode.INLINE, payload: new TextEncoder().encode("payload") }, mutation: (bytes) => { bytes[81] = bytes[81]! ^ 1; }, expected: "SIGNATURE_INVALID" },
+  { name: "wrong-issuer", input: { ...base, mode: QCCodeMode.INLINE, payload: new Uint8Array() }, mutation: (bytes) => { bytes[9] = bytes[9]! ^ 1; }, expected: "UNKNOWN_ISSUER" },
+  { name: "wrong-kid", input: { ...base, mode: QCCodeMode.INLINE, payload: new Uint8Array() }, mutation: (bytes) => { bytes[28] = bytes[28]! ^ 1; }, expected: "UNKNOWN_KEY" },
+  { name: "replay", input: { ...base, mode: QCCodeMode.CHALLENGE, flags: 7, payload: encodeChallengePayload(1, new Uint8Array(16).fill(9)) }, expected: "ACCEPTED_THEN_REPLAYED" },
 ];
 
 await rm(out, { recursive: true, force: true });
@@ -52,13 +52,13 @@ for (const definition of definitions) {
   const envelope = await issueEnvelope(definition.input, privateKey);
   definition.mutation?.(envelope);
   const parsed = parseEnvelope(envelope);
-  const symbol = encodeCircleCode(envelope);
+  const symbol = encodeQCCode(envelope);
   const frame = createVisualFrame(envelope, symbol.layout, symbol.mask);
   const codewords = encodeVisualCodewords(frame, symbol.layout);
   const directory = join(out, definition.name);
   await mkdir(directory, { recursive: true });
   const fields = {
-    mode: CircleCodeMode[parsed.mode], flags: parsed.flags, issuerIdHex: hex(parsed.issuerId), keyId: parsed.keyId,
+    mode: QCCodeMode[parsed.mode], flags: parsed.flags, issuerIdHex: hex(parsed.issuerId), keyId: parsed.keyId,
     messageType: parsed.messageType, messageIdHex: hex(parsed.messageId), issuedAt: parsed.issuedAt.toString(),
     expiresAt: parsed.expiresAt.toString(), nonceHex: hex(parsed.nonce), payloadHex: hex(parsed.payload),
   };
@@ -78,4 +78,4 @@ for (const definition of definitions) {
   ]);
 }
 
-console.log(`Generated ${definitions.length} CircleCode V1 vectors in ${out}`);
+console.log(`Generated ${definitions.length} QCCode V1 vectors in ${out}`);
