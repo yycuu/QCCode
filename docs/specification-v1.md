@@ -2,6 +2,8 @@
 
 Status: implementation specification for protocol version 1.0.
 
+C1/C2/C3 formats are deprecated as of SDK v0.3.5 and will be removed in a future release. New integrations should use S1 bearer envelopes with online redemption. The legacy wire format, automatic layout selection, and validation rules below remain unchanged during the deprecation period.
+
 QCCode is an independent circular binary visual-code protocol. It does not use QR, Aztec, Data Matrix, or Apple App Clip Code layouts or wire formats. Normative terms MUST, MUST NOT, SHOULD, and MAY have their RFC 2119 meanings.
 
 ## Architecture and security boundary

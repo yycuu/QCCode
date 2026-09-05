@@ -16,6 +16,14 @@ export interface ReplayStore {
 const id = (bytes: Uint8Array): string => toBase64Url(bytes);
 const bearerRecordId = (resourceId: Uint8Array, messageId: Uint8Array): Uint8Array => new Uint8Array([...resourceId, ...messageId]);
 
+let warnedDeprecatedSignedFormat = false;
+
+function warnDeprecatedSignedFormat(): void {
+  if (warnedDeprecatedSignedFormat) return;
+  warnedDeprecatedSignedFormat = true;
+  console.warn("[QCCode server-sdk] C1/C2/C3 formats are deprecated as of v0.3.5 and will be removed in a future release. Migrate to S1 using issueBearer() and redeemBearer(); S1 requires online redemption and does not support signed envelopes or offline verification.");
+}
+
 export class MemoryReplayStore implements ReplayStore {
   readonly #claims = new Map<string, { nonce: string; expiresAt: bigint }>();
   async redeem<T>(issuerId: Uint8Array, messageId: Uint8Array, nonce: Uint8Array, expiresAt: bigint, operation: () => Promise<T>): Promise<{ status: "accepted"; result: T } | { status: "already-used" | "expired" }> {
@@ -136,7 +144,9 @@ export class QCCodeServer {
   get keyRecord(): QCCodePublicKeyRecord { return { issuerId: this.issuer.issuerId, keyId: this.issuer.keyId, publicKey: this.issuer.publicKey, status: "CURRENT", notBefore: this.issuer.keyNotBefore, notAfter: this.issuer.keyNotAfter }; }
   get publicKeys(): readonly QCCodePublicKeyRecord[] { return this.#keys.map((key) => ({ ...key, issuerId: key.issuerId.slice(), publicKey: key.publicKey.slice() })); }
 
+  /** @deprecated C1/C2/C3 will be removed in a future release. Use issueBearer() for S1 with online redemption. */
   async issue(input: { mode: QCCodeMode; messageType: number; payload: Uint8Array; expiresIn: number; singleUse?: boolean; requireConfirmation?: boolean; now?: bigint }): Promise<{ envelope: Uint8Array; envelopeBase64Url: string }> {
+    warnDeprecatedSignedFormat();
     if (!Number.isInteger(input.expiresIn) || input.expiresIn < 1 || input.expiresIn > this.#policy.maxTTLSeconds) throw new Error(`expiresIn must be 1..${this.#policy.maxTTLSeconds} seconds`);
     if (this.#policy.allowedModes && !this.#policy.allowedModes.includes(input.mode)) throw new Error("mode is not allowed by server policy");
     if (this.#policy.allowedMessageTypes && !this.#policy.allowedMessageTypes.includes(input.messageType)) throw new Error("messageType is not allowed by server policy");
@@ -221,7 +231,9 @@ export class QCCodeServer {
     await this.storage.transaction((tx) => this.storage.revoke(tx, this.issuer.issuerId, messageId, expiresAt));
   }
 
+  /** @deprecated C1/C2/C3 will be removed in a future release. Use redeemBearer() for S1 bearer envelopes. */
   async redeem(input: Uint8Array | string): Promise<RedeemResult> {
+    warnDeprecatedSignedFormat();
     let envelope: EnvelopeV1;
     try {
       const now = this.#options.clock();
@@ -264,5 +276,9 @@ export class QCCodeServer {
     } catch (error) { this.#options.onError?.(error); return { status: "SERVER_REJECTED" }; }
   }
 
-  parse(envelope: string): ReturnType<typeof parseEnvelope> { return parseEnvelope(fromBase64Url(envelope)); }
+  /** @deprecated C1/C2/C3 will be removed in a future release. Use parseBearerEnvelope(fromBase64Url(envelope)) for S1; parsing is not verification. */
+  parse(envelope: string): ReturnType<typeof parseEnvelope> {
+    warnDeprecatedSignedFormat();
+    return parseEnvelope(fromBase64Url(envelope));
+  }
 }

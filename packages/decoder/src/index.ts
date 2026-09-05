@@ -5,11 +5,14 @@ import { BEARER_ENVELOPE_BYTES, equalBytes, isBearerEnvelope, parseBearerEnvelop
 export type IdealDecodeResult = {
   envelopeBytes: Uint8Array;
   envelope: EnvelopeV1 | BearerEnvelope;
+  /** C1/C2/C3 are deprecated and will be removed in a future release. Migrate to S1. */
   layout: "C1" | "C2" | "C3" | "S1";
   mask: number;
   correctedErrors: number;
   erasures: number;
 };
+
+let warnedDeprecatedLayout = false;
 
 function decodeSymbol(symbol: QCCodeSymbol, unknownPhysicalSlots: readonly number[]): IdealDecodeResult {
   const bootstrap = decodeBootstrap(symbol.bootstrap);
@@ -55,6 +58,10 @@ function decodeSymbol(symbol: QCCodeSymbol, unknownPhysicalSlots: readonly numbe
     envelope = isBearerEnvelope(envelopeBytes) ? parseBearerEnvelope(envelopeBytes) : parseEnvelope(envelopeBytes);
   }
   if (!equalBytes(envelope.bytes, envelopeBytes)) throw new Error("PROTOCOL_INVALID");
+  if (symbol.layout.visualVersion === 1 && !warnedDeprecatedLayout) {
+    warnedDeprecatedLayout = true;
+    console.warn("[QCCode] C1/C2/C3 formats are deprecated as of v0.3.5 and will be removed in a future release. Migrate to S1 using server-issued bearer envelopes and online redemption; S1 does not support signed envelopes or offline verification.");
+  }
   return {
     envelopeBytes,
     envelope,

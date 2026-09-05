@@ -1,3 +1,4 @@
+/** C1/C2/C3 are deprecated as of v0.3.5 and will be removed in a future release. Use S1. */
 export type LayoutId = "C1" | "C2" | "C3" | "S1";
 
 export type QCCodeLayout = {

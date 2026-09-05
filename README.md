@@ -4,6 +4,8 @@ QCCode is an independent circular visual-code protocol built around concentric r
 
 The server is the only component that signs messages. Display clients receive an already-signed envelope and only perform visual encoding.
 
+**v0.3.5 deprecation notice:** C1/C2/C3 formats are deprecated and will be removed in a future release. Migrate to S1 using server-issued bearer envelopes and online redemption. Existing C formats still work, with English console warnings from the SDKs. Signed envelopes cannot simply be rendered as S1, and S1 does not support offline signature verification. See the [migration guidance](packages/sdk/README.md#c1c2c3-deprecation-in-v035).
+
 ## Install
 
 ```bash

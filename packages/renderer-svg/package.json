@@ -1,6 +1,6 @@
 {
   "name": "@qccode/renderer-svg",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "Render accessible QCCode symbols as SVG with themes and center logos.",
   "type": "module",
   "main": "./dist/index.js",

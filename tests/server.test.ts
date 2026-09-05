@@ -10,6 +10,29 @@ async function server(): Promise<QCCodeServer> {
   return new QCCodeServer({ issuerId: new Uint8Array(16).fill(4), keyId: 1, privateKeyPkcs8: await privateKeyFromSeed(seed), publicKey, keyNotBefore: now - 100n, keyNotAfter: now + 10_000n });
 }
 
+describe("server SDK format deprecation", () => {
+  it.each(["issue", "redeem", "parse"] as const)("warns once when using the legacy %s entry point", async (method) => {
+    const base = await server();
+    const input = { mode: QCCodeMode.INLINE, messageType: 1, payload: new Uint8Array(), expiresIn: 60 };
+    const issued = await base.issue(input);
+    vi.resetModules();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const { QCCodeServer: FreshServer } = await import("../packages/server-sdk/src/index.js");
+      const instance = new FreshServer(base.issuer);
+      const bearer = await instance.issueBearer({ resourceType: 1, messageType: 1, expiresIn: 60 });
+      expect((await instance.redeemBearer(bearer.envelope)).status).toBe("ACCEPTED");
+      expect(warn).not.toHaveBeenCalled();
+      for (let attempt = 0; attempt < 2; attempt++) {
+        if (method === "issue") expect((await instance.issue(input)).envelope).toBeInstanceOf(Uint8Array);
+        else if (method === "redeem") expect((await instance.redeem(issued.envelope)).status).toBe("ACCEPTED");
+        else expect(instance.parse(issued.envelopeBase64Url).bytes).toEqual(issued.envelope);
+      }
+      expect(warn).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/C1\/C2\/C3.*deprecated.*v0\.3\.5.*removed in a future release.*Migrate to S1.*issueBearer\(\).*redeemBearer\(\)/));
+    } finally { warn.mockRestore(); }
+  });
+});
+
 describe("reference server replay policy", () => {
   it("allows exactly one concurrent redemption", async () => {
     const instance = await server();

@@ -1,6 +1,6 @@
 # QCCode 生产环境完整集成指南
 
-本文对应 `@qccode/server-sdk` 0.3.4 和 `@qccode/sdk` 0.3.4。目标依赖结构是：
+本文对应 `@qccode/server-sdk` 0.3.5 和 `@qccode/sdk` 0.3.5。目标依赖结构是：
 
 ```bash
 # 服务器：QCCode 只安装一个包
@@ -11,6 +11,12 @@ npm install @qccode/sdk
 ```
 
 `server-sdk` 会传递安装并重新导出 protocol 与 security API，因此服务器无需直接安装其他 `@qccode/*` 包。数据库、HTTP 框架和 KMS client 继续使用现有系统中的驱动，不由 QCCode 强制选择。
+
+## v0.3.5 弃用与迁移
+
+C1/C2/C3 格式已废弃，将在后续版本移除，建议迁移到 S1。旧格式在本版本仍可使用；编码、成功解码（含扫描）以及服务端 `issue()`、`redeem()`、`parse()` 会输出英文 `console.warn`，每个相关模块只提示一次，避免扫描和请求循环刷屏。仅导入 SDK 或使用 S1/Bearer 不会触发提示。
+
+已有 Bearer Envelope 可直接使用 `encodeQCCode(bytes, { layout: "S1" })`，或使用默认 `auto`。签名 Envelope 无法放入 S1，必须通过 `issueBearer()` 重新签发，将业务数据放在服务端，并使用 `redeemBearer()` 在线核销。S1 不支持离线验签；INLINE/CHALLENGE 业务迁移时需保留服务端授权及用户确认检查，不能只改布局。下文旧签名接口示例仅供维护存量集成，新增集成参考 [Server SDK 的 S1 示例](../packages/server-sdk/README.md)。0.3.4 的 Bearer 安全升级要求仍然有效。
 
 ## 1. 生产数据流
 
