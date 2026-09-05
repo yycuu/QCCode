@@ -48,7 +48,7 @@ Server
 
 ## 2. 仓库与包
 
-当前项目是 pnpm TypeScript monorepo。`@qccode/*` 0.1.0 与 0.2.0 已发布到公共 npm registry；仓库中的生产集成接口版本为 0.3.3。仓库内部通过 `workspace:*` 引用。
+当前项目是 pnpm TypeScript monorepo。`@qccode/*` 0.1.0 与 0.2.0 已发布到公共 npm registry；仓库中的生产集成接口版本为 0.3.4。仓库内部通过 `workspace:*` 引用。
 
 | 包 | 用途 |
 |---|---|
@@ -112,6 +112,8 @@ resourceId:   16-byte opaque random ID
 - 不会把敏感业务数据直接暴露在图片中。
 
 需要更简洁、更易扫的视觉时，REFERENCE 还可以使用稀疏布局 S1：数据环改为和定位环一样的粗圆头短弧，码内只放 48 字节 Bearer Envelope（12 字节随机 resourceId，无签名）。S1 依赖 96 位随机 ID 和服务端原子一次性核销，不支持离线验签；V1 签名布局保持不变。服务端通过 `QCCodeServer.issueBearer` / `redeemBearer` 签发与核销。
+
+0.3.4 起，服务端持久化完整 Bearer Envelope 并核对所有字段，禁止修改消息 ID、单次使用标志或有效期来绕过核销。升级前的 Bearer 码必须重新签发；存储适配与升级要求见 [生产集成指南](production-integration.md)。
 
 ### 3.2 CHALLENGE
 

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { MemoryQCCodeStorage, QCCodeMode, QCCodeServer, encodeReferencePayload, privateKeyFromSeed, signEd25519 } from "../packages/server-sdk/src/index.js";
+import { describe, expect, it, vi } from "vitest";
+import { MemoryQCCodeStorage, QCCodeMode, QCCodeServer, createQCCodeStorage, encodeReferencePayload, parseBearerEnvelope, parseEnvelope, privateKeyFromSeed, signEd25519 } from "../packages/server-sdk/src/index.js";
 
 const hex = (value: string) => Uint8Array.from(value.match(/../gu) ?? [], (pair) => Number.parseInt(pair, 16));
 const seed = hex("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
@@ -76,5 +76,147 @@ describe("reference server replay policy", () => {
     expect((await current.redeem(issued.envelope)).status).toBe("ACCEPTED");
     expect((await current.issue({ mode: QCCodeMode.INLINE, messageType: 1, payload: new Uint8Array(), expiresIn: 60 })).envelope).toBeInstanceOf(Uint8Array);
     expect(current.publicKeys.map((key) => key.keyId)).toEqual([2, 1]);
+  });
+
+  it("revokes signed envelopes without changing their issuer namespace", async () => {
+    const instance = await server();
+    const issued = await instance.issue({ mode: QCCodeMode.INLINE, messageType: 1, payload: new Uint8Array(), expiresIn: 60 });
+    await instance.revoke(parseEnvelope(issued.envelope).messageId);
+    expect((await instance.redeem(issued.envelope)).status).toBe("REVOKED");
+    await expect(instance.revoke(new Uint8Array(8))).rejects.toThrow("messageId");
+  });
+});
+
+describe("bearer server policy", () => {
+  it("allows exactly one concurrent redemption", async () => {
+    const instance = await server();
+    const issued = await instance.issueBearer({ resourceType: 1, messageType: 4, expiresIn: 60, resourceValue: { protected: true } });
+    const results = await Promise.all(Array.from({ length: 20 }, () => instance.redeemBearer(issued.envelopeBase64Url)));
+    expect(results.filter((result) => result.status === "ACCEPTED")).toEqual([{ status: "ACCEPTED", result: { protected: true } }]);
+    expect(results.filter((result) => result.status === "REPLAYED")).toHaveLength(19);
+  });
+
+  it.each([
+    ["single-use flag", 3],
+    ["message type", 4],
+    ["message ID", 14],
+    ["issued-at", 29],
+    ["expires-at", 33],
+  ] as const)("rejects a modified %s without bypassing replay protection", async (_field, offset) => {
+    const instance = await server();
+    const issued = await instance.issueBearer({ resourceType: 1, messageType: 4, expiresIn: 60, resourceValue: "test resource" });
+    expect((await instance.redeemBearer(issued.envelope)).status).toBe("ACCEPTED");
+    const modified = issued.envelope.slice();
+    modified[offset] = modified[offset]! ^ 1;
+    expect((await instance.redeemBearer(modified)).status).toBe(offset === 14 ? "NOT_FOUND" : "INVALID");
+    expect((await instance.redeemBearer(issued.envelope)).status).toBe("REPLAYED");
+  });
+
+  it("rejects a forged expiry and respects the original validity interval", async () => {
+    const base = await server();
+    let now = 1_700_000_000n;
+    const instance = new QCCodeServer(base.issuer, { clock: () => now });
+    const issued = await instance.issueBearer({ resourceType: 1, messageType: 4, expiresIn: 60, resourceValue: "test resource" });
+    now -= 1n;
+    expect((await instance.redeemBearer(issued.envelope)).status).toBe("INVALID");
+    now += 61n;
+    expect((await instance.redeemBearer(issued.envelope)).status).toBe("EXPIRED");
+    const modified = issued.envelope.slice();
+    new DataView(modified.buffer).setUint32(30, Number(now) + 3600, false);
+    expect((await instance.redeemBearer(modified)).status).toBe("INVALID");
+  });
+
+  it.each([true, false])("revokes bearer envelopes with singleUse=%s", async (singleUse) => {
+    const instance = await server();
+    const issued = await instance.issueBearer({ resourceType: 1, messageType: 4, expiresIn: 60, singleUse, resourceValue: "test resource" });
+    await instance.revoke(parseBearerEnvelope(issued.envelope).messageId);
+    expect((await instance.redeemBearer(issued.envelope)).status).toBe("REVOKED");
+    const modified = issued.envelope.slice();
+    modified[14] = modified[14]! ^ 1;
+    expect((await instance.redeemBearer(modified)).status).toBe("NOT_FOUND");
+  });
+
+  it("preserves explicitly reusable tokens and resources without a value", async () => {
+    const instance = await server();
+    const issued = await instance.issueBearer({ resourceType: 1, messageType: 4, expiresIn: 60, singleUse: false });
+    const first = await instance.redeemBearer(issued.envelope);
+    expect(first).toMatchObject({ status: "ACCEPTED", result: { mode: "REFERENCE", resourceType: 1 } });
+    expect(await instance.redeemBearer(issued.envelope)).toEqual(first);
+  });
+
+  it.each([8, 16])("fails closed for resource-only entries under a %s-byte issuer", async (issuerLength) => {
+    const base = await server();
+    const issued = await base.issueBearer({ resourceType: 1, messageType: 4, expiresIn: 60, resourceValue: "test resource" });
+    const instance = new QCCodeServer(base.issuer);
+    const envelope = parseBearerEnvelope(issued.envelope);
+    await instance.storage.transaction((tx) => instance.storage.putResource(tx, instance.issuer.issuerId.slice(0, issuerLength), envelope.resourceType, envelope.resourceId, { legacy: true }));
+    expect((await instance.redeemBearer(issued.envelope)).status).toBe("NOT_FOUND");
+  });
+
+  it("keeps separate tokens for the same resource independently redeemable and revocable", async () => {
+    const instance = await server();
+    const input = { resourceType: 1, messageType: 4, resourceId: new Uint8Array(12).fill(7), expiresIn: 60, resourceValue: "test resource" };
+    const first = await instance.issueBearer(input);
+    const second = await instance.issueBearer(input);
+    expect((await instance.redeemBearer(first.envelope)).status).toBe("ACCEPTED");
+    expect((await instance.redeemBearer(second.envelope)).status).toBe("ACCEPTED");
+    expect((await instance.redeemBearer(first.envelope)).status).toBe("REPLAYED");
+    expect((await instance.redeemBearer(second.envelope)).status).toBe("REPLAYED");
+    const reusable = await instance.issueBearer({ ...input, singleUse: false });
+    const revoked = await instance.issueBearer(input);
+    await instance.revoke(parseBearerEnvelope(revoked.envelope).messageId);
+    expect((await instance.redeemBearer(reusable.envelope)).status).toBe("ACCEPTED");
+    expect((await instance.redeemBearer(revoked.envelope)).status).toBe("REVOKED");
+    expect((await instance.redeemBearer(reusable.envelope)).status).toBe("ACCEPTED");
+  });
+
+  it("snapshots Buffer input before asynchronous storage access", async () => {
+    const instance = await server();
+    const issued = await instance.issueBearer({ resourceType: 1, messageType: 4, expiresIn: 60, resourceValue: "test resource" });
+    expect((await instance.redeemBearer(issued.envelope)).status).toBe("ACCEPTED");
+    const buffer = Buffer.from(issued.envelope);
+    buffer[3] = buffer[3]! ^ 1;
+    const result = instance.redeemBearer(buffer);
+    buffer.set(issued.envelope);
+    expect((await result).status).toBe("INVALID");
+    expect((await instance.redeemBearer(issued.envelope)).status).toBe("REPLAYED");
+  });
+
+  it("persists JSON-safe authority using the adapter transaction and survives server recreation", async () => {
+    const base = await server();
+    const memory = new MemoryQCCodeStorage();
+    const client = { active: true };
+    const storage = createQCCodeStorage({
+      transaction: <T>(operation: (tx: typeof client) => Promise<T>) => memory.transaction(() => operation(client)),
+      putResource: async (tx, issuerId, resourceType, resourceId, value) => {
+        expect(tx).toBe(client);
+        await memory.putResource(tx, issuerId, resourceType, resourceId, JSON.parse(JSON.stringify(value)));
+      },
+      getResource: async (tx, ...args) => { expect(tx).toBe(client); return memory.getResource(tx, ...args); },
+      claimRedemption: async (tx, claim) => { expect(tx).toBe(client); return memory.claimRedemption(tx, claim); },
+      completeRedemption: async (tx, claim, result) => { expect(tx).toBe(client); await memory.completeRedemption(tx, claim, result); },
+      isRevoked: async (tx, ...args) => { expect(tx).toBe(client); return memory.isRevoked(tx, ...args); },
+      revoke: async (tx, issuerId, messageId) => { expect(tx).toBe(client); await memory.revoke(tx, issuerId, messageId); },
+    });
+    const instance = new QCCodeServer(base.issuer, { storage });
+    const issued = await instance.issueBearer({ resourceType: 1, messageType: 4, expiresIn: 60, resourceValue: { protected: true } });
+    const restarted = new QCCodeServer(base.issuer, { storage });
+    expect(await restarted.redeemBearer(issued.envelope)).toEqual({ status: "ACCEPTED", result: { protected: true } });
+    expect((await instance.redeemBearer(issued.envelope)).status).toBe("REPLAYED");
+  });
+
+  it("rolls back bearer issuance if the resource write fails", async () => {
+    const instance = await server();
+    const putResource = instance.storage.putResource.bind(instance.storage);
+    const resourceId = new Uint8Array(12).fill(7);
+    let storedId: Uint8Array | undefined;
+    vi.spyOn(instance.storage, "putResource").mockImplementationOnce(async (...args) => {
+      storedId = args[3];
+      await putResource(...args);
+      throw new Error("write failed");
+    });
+    await expect(instance.issueBearer({ resourceType: 1, resourceId, messageType: 4, expiresIn: 60, resourceValue: "test resource" })).rejects.toThrow("write failed");
+    expect(storedId).toHaveLength(24);
+    expect(await instance.storage.getResource(undefined, instance.issuer.issuerId, 1, storedId!)).toBeNull();
   });
 });

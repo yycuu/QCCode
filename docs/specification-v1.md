@@ -125,6 +125,10 @@ Each slot renders as a rounded-cap arc spanning 16% of its angular pitch with a 
 
 The S1 bearer envelope is exactly 48 bytes: magic `0xc4 0x02`, mode `0x02` (REFERENCE), flags, uint16 message type, 8-byte issuer id, 12-byte message id, uint32 issued-at and expires-at, uint16 resource type, and 12-byte resource id. It carries no signature: 96-bit resource ids are unguessable bearer secrets verified server-side with atomic single-use redemption. V1 signed layouts are unchanged and remain the offline-verifiable format.
 
+Parsers MUST validate the received mode byte as REFERENCE, require the server-resolution flag, reject reserved flag bits, and require expires-at to be greater than issued-at. Encoders MUST reject non-integer, negative, or overflowing uint32 timestamps rather than truncate them.
+
+Servers MUST bind the complete bearer envelope to a trusted issuance record. They MUST NOT derive replay keys, expiry, or single-use policy from unsigned client fields without checking that binding. Modified or unrecorded envelopes MUST NOT be accepted. The storage namespace used for issuance, claims, and revocation MUST identify the same configured issuer, independently of its truncated wire representation. These requirements do not change the 48-byte wire format.
+
 ## Server policy
 
 Key lookup uses `(issuerId,keyId)`. New messages use the current key; previous keys may verify messages within their stated lifetime; revoked keys fail. Offline verification is possible only with a cached trusted key.

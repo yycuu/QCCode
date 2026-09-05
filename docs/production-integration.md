@@ -1,6 +1,6 @@
 # QCCode 生产环境完整集成指南
 
-本文对应 `@qccode/server-sdk` 0.2 和 `@qccode/sdk` 0.2。目标依赖结构是：
+本文对应 `@qccode/server-sdk` 0.3.4 和 `@qccode/sdk` 0.3.4。目标依赖结构是：
 
 ```bash
 # 服务器：QCCode 只安装一个包
@@ -292,6 +292,14 @@ const issued = await qccode.issue({
 ```
 
 返回的 `issued.envelopeBase64Url` 直接发送给显示端。资源写入成功后再返回 Envelope，避免码已经显示但资源尚不存在。
+
+### S1 Bearer 安全升级（0.3.4）
+
+`issueBearer()` 会在一个存储事务内写入原始 Envelope 和业务数据，`redeemBearer()` 必须先核对完整 Envelope，再判断有效期、撤销和一次性核销。客户端修改 `messageId`、`flags` 或时间戳不能改变服务端策略。
+
+适配器无需新增方法，但必须原样保存 SDK 的 JSON 记录，并允许资源存储键为 24 字节的 `resourceId || messageId`。资源、核销和撤销记录都使用完整的 16 字节 issuer ID；码内的 issuer ID 仍为 8 字节，resource ID 仍为 12 字节，线格式不变。本文的 PostgreSQL `BYTEA` 表结构支持这些长度。同一资源签发多个码时，每个码独立保存签发时的业务数据和核销状态。`revoke(messageId)` 同时支持 12 字节 Bearer 和 16 字节签名消息 ID。
+
+**升级前签发的所有 Bearer 码必须重新签发**，包括使用 C1/C2/C3 显示的 Bearer 数据。旧记录缺少可信策略，不能自动迁移为签发凭据，也不能保留旧版核销逻辑作为回退。V1 签名码不受影响。
 
 ## 8. HTTP API
 

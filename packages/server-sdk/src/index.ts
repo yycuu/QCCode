@@ -7,12 +7,14 @@ export * from "@qccode/security";
 export type RedeemStatus = "ACCEPTED" | "REPLAYED" | "EXPIRED" | "REVOKED" | "NOT_FOUND" | "INVALID" | "SERVER_REJECTED";
 export type RedeemResult = { status: RedeemStatus; result?: unknown };
 export type RedemptionClaim = { issuerId: Uint8Array; messageId: Uint8Array; nonce: Uint8Array; expiresAt: bigint; now: bigint };
+type BearerResourceRecord = { kind: "qccode-bearer-v1"; envelopeBase64Url: string; value: unknown };
 
 export interface ReplayStore {
   redeem<T>(issuerId: Uint8Array, messageId: Uint8Array, nonce: Uint8Array, expiresAt: bigint, operation: () => Promise<T>): Promise<{ status: "accepted"; result: T } | { status: "already-used" | "expired" }>;
 }
 
 const id = (bytes: Uint8Array): string => toBase64Url(bytes);
+const bearerRecordId = (resourceId: Uint8Array, messageId: Uint8Array): Uint8Array => new Uint8Array([...resourceId, ...messageId]);
 
 export class MemoryReplayStore implements ReplayStore {
   readonly #claims = new Map<string, { nonce: string; expiresAt: bigint }>();
@@ -156,48 +158,55 @@ export class QCCodeServer {
     if (!Number.isInteger(input.resourceType) || input.resourceType < 0 || input.resourceType > 0xffff) throw new Error("resourceType is out of range");
     if (this.#policy.allowedMessageTypes && !this.#policy.allowedMessageTypes.includes(input.messageType)) throw new Error("messageType is not allowed by server policy");
     const now = input.now ?? this.#options.clock();
-    const resourceId = input.resourceId ?? this.#options.randomBytes(12);
+    const resourceId = new Uint8Array(input.resourceId ?? this.#options.randomBytes(12));
     if (resourceId.length !== 12) throw new Error("bearer resourceId must be 12 bytes");
     const bearerIssuerId = this.issuer.issuerId.slice(0, 8);
+    const messageId = this.#options.randomBytes(12);
     const envelope = encodeBearerEnvelope({
       issuerId: bearerIssuerId,
       messageType: input.messageType,
-      messageId: this.#options.randomBytes(12),
+      messageId,
       issuedAt: Number(now),
       expiresAt: Number(now) + input.expiresIn,
       resourceType: input.resourceType,
       resourceId,
       flags: (input.singleUse !== false ? QCCodeFlag.SINGLE_USE : 0) | QCCodeFlag.SERVER_RESOLUTION_REQUIRED,
     });
-    await this.storage.putResource(undefined, bearerIssuerId, input.resourceType, resourceId, input.resourceValue ?? null);
-    return { envelope, envelopeBase64Url: toBase64Url(envelope) };
+    const envelopeBase64Url = toBase64Url(envelope);
+    // Bind every unsigned field to the issued token, not to client-supplied policy.
+    const record: BearerResourceRecord = { kind: "qccode-bearer-v1", envelopeBase64Url, value: input.resourceValue ?? null };
+    // Keep authority in the full issuer namespace, separate from legacy bearer values.
+    await this.storage.transaction((tx) => this.storage.putResource(tx, this.issuer.issuerId, input.resourceType, bearerRecordId(resourceId, messageId), record));
+    return { envelope, envelopeBase64Url };
   }
 
   async redeemBearer(input: Uint8Array | string): Promise<RedeemResult> {
     let envelope: BearerEnvelope;
     try {
-      const now = this.#options.clock();
+      if (typeof input === "string" && input.length > Math.ceil(this.#policy.maxEnvelopeBytes * 4 / 3) + 4) return { status: "INVALID" };
       const bytes = typeof input === "string" ? fromBase64Url(input) : input;
       if (bytes.length > this.#policy.maxEnvelopeBytes) return { status: "INVALID" };
       envelope = parseBearerEnvelope(bytes);
-      if (envelope.expiresAt <= Number(now)) return { status: "EXPIRED" };
       const bearerIssuerId = this.issuer.issuerId.slice(0, 8);
       if (id(envelope.issuerId) !== id(bearerIssuerId)) return { status: "INVALID" };
     } catch { return { status: "INVALID" }; }
 
     const operation = async (): Promise<RedeemResult> => this.storage.transaction(async (tx) => {
+      const record = await this.storage.getResource(tx, this.issuer.issuerId, envelope.resourceType, bearerRecordId(envelope.resourceId, envelope.messageId)) as Partial<BearerResourceRecord> | null;
+      if (record === null) return { status: "NOT_FOUND" };
+      // Legacy resource-only entries cannot establish expiry or single-use policy.
+      if (record.kind !== "qccode-bearer-v1" || record.envelopeBase64Url !== toBase64Url(envelope.bytes)) return { status: "INVALID" };
       const now = this.#options.clock();
-      if (envelope.expiresAt <= Number(now)) return { status: "EXPIRED" };
-      if (await this.storage.isRevoked(tx, envelope.issuerId, envelope.messageId)) return { status: "REVOKED" };
-      const value = await this.storage.getResource(tx, envelope.issuerId, envelope.resourceType, envelope.resourceId);
-      if (value === null) return { status: "NOT_FOUND" };
-      const claim: RedemptionClaim = { issuerId: envelope.issuerId, messageId: envelope.messageId, nonce: envelope.messageId, expiresAt: BigInt(envelope.expiresAt), now };
+      if (BigInt(envelope.expiresAt) <= now) return { status: "EXPIRED" };
+      if (BigInt(envelope.issuedAt) > now + this.#policy.clockSkewSeconds) return { status: "INVALID" };
+      if (await this.storage.isRevoked(tx, this.issuer.issuerId, envelope.messageId)) return { status: "REVOKED" };
+      const claim: RedemptionClaim = { issuerId: this.issuer.issuerId, messageId: envelope.messageId, nonce: envelope.messageId, expiresAt: BigInt(envelope.expiresAt), now };
       if (envelope.flags & QCCodeFlag.SINGLE_USE) {
         const state = await this.storage.claimRedemption(tx, claim);
         if (state === "expired") return { status: "EXPIRED" };
         if (state === "replayed") return { status: "REPLAYED" };
       }
-      const result = value ?? { mode: QCCodeMode[envelope.mode], resourceType: envelope.resourceType, resourceId: toBase64Url(envelope.resourceId) };
+      const result = record.value ?? { mode: QCCodeMode[envelope.mode], resourceType: envelope.resourceType, resourceId: toBase64Url(envelope.resourceId) };
       if (envelope.flags & QCCodeFlag.SINGLE_USE) await this.storage.completeRedemption?.(tx, claim, result);
       return { status: "ACCEPTED", result };
     });
@@ -207,7 +216,10 @@ export class QCCodeServer {
 
   async putResource(type: number, resourceId: Uint8Array, value: unknown): Promise<void> { await this.storage.transaction((tx) => this.storage.putResource(tx, this.issuer.issuerId, type, resourceId, value)); }
   registerResource(resourceId: Uint8Array, value: unknown, type = -1): Promise<void> { return this.putResource(type, resourceId, value); }
-  async revoke(messageId: Uint8Array, expiresAt?: bigint): Promise<void> { await this.storage.transaction((tx) => this.storage.revoke(tx, this.issuer.issuerId, messageId, expiresAt)); }
+  async revoke(messageId: Uint8Array, expiresAt?: bigint): Promise<void> {
+    if (messageId.length !== 12 && messageId.length !== 16) throw new Error("messageId must be 12 bearer bytes or 16 signed bytes");
+    await this.storage.transaction((tx) => this.storage.revoke(tx, this.issuer.issuerId, messageId, expiresAt));
+  }
 
   async redeem(input: Uint8Array | string): Promise<RedeemResult> {
     let envelope: EnvelopeV1;

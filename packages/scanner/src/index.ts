@@ -13,6 +13,8 @@ export type QCCodeScanResult = {
 
 export class QCCodeScanner {
   #stream: MediaStream | undefined;
+  #video: HTMLVideoElement | undefined;
+  #cameraRequest = 0;
   #correction: Correction | undefined;
   #correctionOffset = 0;
 
@@ -38,14 +40,30 @@ export class QCCodeScanner {
 
   async startCamera(video: HTMLVideoElement): Promise<void> {
     this.stopCamera();
-    this.#stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
-    video.srcObject = this.#stream;
-    await video.play();
+    const request = this.#cameraRequest;
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+    if (request !== this.#cameraRequest) {
+      for (const track of stream.getTracks()) track.stop();
+      return;
+    }
+    this.#stream = stream;
+    this.#video = video;
+    try {
+      video.srcObject = stream;
+      await video.play();
+    } catch (error) {
+      // A newer start or stop already cleaned up a superseded stream.
+      if (request === this.#cameraRequest) this.stopCamera();
+      throw error;
+    }
   }
 
   stopCamera(): void {
+    this.#cameraRequest++;
     for (const track of this.#stream?.getTracks() ?? []) track.stop();
+    if (this.#video && this.#video.srcObject === this.#stream) this.#video.srcObject = null;
     this.#stream = undefined;
+    this.#video = undefined;
   }
 
   async scanVideoFrame(video: HTMLVideoElement, canvas = document.createElement("canvas")): Promise<QCCodeScanResult> {

@@ -78,8 +78,12 @@ export function encodeBearerEnvelope(input: BearerEnvelopeInput): Uint8Array {
   requireUint("messageType", input.messageType, 0xffff);
   requireUint("resourceType", input.resourceType, 0xffff);
   const flags = input.flags ?? QCCodeFlag.SINGLE_USE | QCCodeFlag.SERVER_RESOLUTION_REQUIRED;
+  requireUint("flags", flags, 0xff);
   if ((flags & ~V1_KNOWN_FLAGS) !== 0) throw new QCCodeProtocolError("UNSUPPORTED_FLAGS", "reserved flags must be zero");
-  if (input.expiresAt <= input.issuedAt || input.expiresAt > 0xffff_ffff) throw new QCCodeProtocolError("PROTOCOL_INVALID", "invalid bearer validity interval");
+  if (!(flags & QCCodeFlag.SERVER_RESOLUTION_REQUIRED)) throw new QCCodeProtocolError("PROTOCOL_INVALID", "REFERENCE requires server resolution");
+  requireUint("issuedAt", input.issuedAt, 0xffff_ffff);
+  requireUint("expiresAt", input.expiresAt, 0xffff_ffff);
+  if (input.expiresAt <= input.issuedAt) throw new QCCodeProtocolError("PROTOCOL_INVALID", "invalid bearer validity interval");
   const bytes = new Uint8Array(BEARER_ENVELOPE_BYTES);
   const view = new DataView(bytes.buffer);
   bytes.set(BEARER_MAGIC, 0);
@@ -97,7 +101,10 @@ export function encodeBearerEnvelope(input: BearerEnvelopeInput): Uint8Array {
 
 export function parseBearerEnvelope(bytes: Uint8Array): BearerEnvelope {
   if (!isBearerEnvelope(bytes)) throw new QCCodeProtocolError("PROTOCOL_INVALID", "invalid bearer envelope magic or length");
+  // Buffer.slice() aliases its input; parsing must retain an owned snapshot.
+  bytes = new Uint8Array(bytes);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (view.getUint8(2) !== QCCodeMode.REFERENCE) throw new QCCodeProtocolError("PROTOCOL_INVALID", "bearer envelope must be REFERENCE");
   const result: BearerEnvelope = {
     mode: QCCodeMode.REFERENCE,
     flags: view.getUint8(3),
@@ -110,8 +117,8 @@ export function parseBearerEnvelope(bytes: Uint8Array): BearerEnvelope {
     resourceId: bytes.slice(36, 48),
     bytes: bytes.slice(),
   };
-  if (result.mode !== QCCodeMode.REFERENCE) throw new QCCodeProtocolError("PROTOCOL_INVALID", "bearer envelope must be REFERENCE");
   if ((result.flags & ~V1_KNOWN_FLAGS) !== 0) throw new QCCodeProtocolError("UNSUPPORTED_FLAGS", "reserved flags must be zero");
+  if (!(result.flags & QCCodeFlag.SERVER_RESOLUTION_REQUIRED)) throw new QCCodeProtocolError("PROTOCOL_INVALID", "REFERENCE requires server resolution");
   if (result.expiresAt <= result.issuedAt) throw new QCCodeProtocolError("PROTOCOL_INVALID", "invalid bearer validity interval");
   return result;
 }

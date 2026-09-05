@@ -1,6 +1,6 @@
 {
   "name": "@qccode/vision",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Computer vision candidate detection and luminance sampling for QCCode.",
   "type": "module",
   "main": "./dist/index.js",

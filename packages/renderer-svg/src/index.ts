@@ -111,8 +111,10 @@ export function renderSvg(symbol: QCCodeSymbol, options: SvgRenderOptions = {}):
   if (center.mode === "logo") {
     const scale = Math.min(center.scale ?? 0.82, 0.82);
     const diameter = inner * 2 * scale;
+    const clipId = `qccode-logo-${crypto.getRandomValues(new Uint32Array(4)).join("-")}`;
+    paths.push(`<defs><clipPath id="${clipId}" clipPathUnits="userSpaceOnUse"><circle cx="128" cy="128" r="${diameter / 2}"/></clipPath></defs>`);
     if (center.background) paths.push(`<circle cx="128" cy="128" r="${inner * 0.9}" fill="${escapeXml(center.background)}"/>`);
-    paths.push(`<image href="${escapeXml(center.imageHref)}" x="${128 - diameter / 2}" y="${128 - diameter / 2}" width="${diameter}" height="${diameter}" preserveAspectRatio="xMidYMid meet"/>`);
+    paths.push(`<image href="${escapeXml(center.imageHref)}" x="${128 - diameter / 2}" y="${128 - diameter / 2}" width="${diameter}" height="${diameter}" preserveAspectRatio="xMidYMid meet" clip-path="url(#${clipId})"/>`);
   }
   const title = escapeXml(options.title ?? "QCCode");
   return `<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${title}" width="${size}" height="${size}" viewBox="0 0 256 256"><title>${title}</title><g fill="${escapeXml(foreground)}">${paths.join("")}</g></svg>`;

@@ -27,7 +27,7 @@ async function inlineEnvelope(payloadLength: number): Promise<Uint8Array> {
 describe("visual protocol", () => {
   it("decodes BCH bootstrap with bit damage", () => {
     const bits = encodeBootstrap(LAYOUTS.C2, 7);
-    bits[1] ^= 1; bits[9] ^= 1; bits[19] ^= 1;
+    for (const index of [1, 9, 19]) bits[index] = bits[index]! ^ 1;
     expect(decodeBootstrap(bits)).toMatchObject({ layout: LAYOUTS.C2, mask: 7, correctedBits: 0 });
   });
 
@@ -53,6 +53,36 @@ describe("visual protocol", () => {
     const logoSvg = renderSvg(symbol, { center: { mode: "logo", imageHref: "/mark.svg", scale: 0.72 } });
     expect(logoSvg).toContain('<image href="/mark.svg"');
     expect(logoSvg).toContain("#F1F3F2");
+  });
+
+  it.each([undefined, 0.72, 1.5])("clips logos to the Canvas circle at scale %s", async (scale) => {
+    const symbol = encodeQCCode(await inlineEnvelope(32));
+    const svg = renderSvg(symbol, { center: { mode: "logo", imageHref: "/mark.svg", background: "#FFFFFF", ...(scale === undefined ? {} : { scale }) } });
+    const clip = /<clipPath id="([^"]+)" clipPathUnits="userSpaceOnUse"><circle cx="128" cy="128" r="([^"]+)"\/><\/clipPath>/u.exec(svg);
+    expect(clip).not.toBeNull();
+    const inner = symbol.layout.centerRadius * 113;
+    const radius = inner * Math.min(scale ?? 0.82, 0.82);
+    expect(Number(clip![2])).toBeCloseTo(radius, 12);
+    expect(Number(clip![2])).toBeLessThan(inner);
+    expect(svg).toContain(`<image href="/mark.svg" x="${128 - radius}" y="${128 - radius}" width="${radius * 2}" height="${radius * 2}" preserveAspectRatio="xMidYMid meet" clip-path="url(#${clip![1]})"/>`);
+    expect(svg).toContain(`<circle cx="128" cy="128" r="${inner * 0.9}" fill="#FFFFFF"/>`);
+  });
+
+  it("uses safe independent logo clip IDs for multiple inline SVGs", async () => {
+    const symbol = encodeQCCode(await inlineEnvelope(32));
+    const options = { center: { mode: "logo", imageHref: '/mark.svg?name="<&' } } as const;
+    const first = renderSvg(symbol, options), second = renderSvg(symbol, options);
+    const firstId = /<clipPath id="([^"]+)"/u.exec(first)![1]!;
+    const secondId = /<clipPath id="([^"]+)"/u.exec(second)![1]!;
+    expect(firstId).toMatch(/^qccode-logo-[0-9]+(?:-[0-9]+){3}$/u);
+    expect(secondId).toMatch(/^qccode-logo-[0-9]+(?:-[0-9]+){3}$/u);
+    expect(firstId).not.toBe(secondId);
+    expect(first).toContain(`clip-path="url(#${firstId})"`);
+    expect(second).toContain(`clip-path="url(#${secondId})"`);
+    expect(first).toContain('href="/mark.svg?name=&quot;&lt;&amp;"');
+    expect(first.replaceAll(firstId, "CLIP")).toBe(second.replaceAll(secondId, "CLIP"));
+    expect(renderSvg(symbol)).toBe(renderSvg(symbol));
+    expect(renderSvg(symbol)).not.toContain("clipPath");
   });
 });
 
