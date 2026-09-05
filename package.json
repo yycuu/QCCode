@@ -10,6 +10,7 @@
     "test:watch": "vitest",
     "dev": "pnpm build && pnpm --filter @qccode/demo dev",
     "server": "pnpm build && pnpm --filter @qccode/reference-server dev",
+    "scanner": "pnpm build && pnpm --filter @qccode/uni-scanner dev",
     "vectors": "tsx scripts/generate-vectors.ts",
     "pack:npm": "node scripts/publish-packages.mjs",
     "release:npm": "node scripts/publish-packages.mjs --publish"

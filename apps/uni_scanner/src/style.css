@@ -1,0 +1,35 @@
+:root { font-family: -apple-system, "PingFang SC", "Segoe UI", sans-serif; color: #e9f0eb; background: #0d110e; font-synthesis: none }
+* { box-sizing: border-box }
+body { margin: 0; min-height: 100dvh; background: radial-gradient(circle at 50% 0%, #1b2a21 0, #0d110e 46rem) }
+main { max-width: 480px; margin: auto; padding: 32px 20px 56px; text-align: center }
+header h1 { margin: 0; font-size: 26px; letter-spacing: .02em }
+header p { margin: 6px 0 0; color: #8b968e; font-size: 14px }
+.frame { position: relative; width: min(92vw, 400px); aspect-ratio: 1; margin: 28px auto 18px; border-radius: 24px; overflow: hidden; background: #050705; box-shadow: 0 24px 70px #0009 }
+.frame video { width: 100%; height: 100%; object-fit: cover; display: block }
+.corner { position: absolute; width: 38px; height: 38px; border: 3px solid #9ee2b4; transition: .2s }
+.tl { top: 14px; left: 14px; border-right: 0; border-bottom: 0; border-radius: 12px 0 0 }
+.tr { top: 14px; right: 14px; border-left: 0; border-bottom: 0; border-radius: 0 12px 0 0 }
+.bl { bottom: 14px; left: 14px; border-right: 0; border-top: 0; border-radius: 0 0 0 12px }
+.br { bottom: 14px; right: 14px; border-left: 0; border-top: 0; border-radius: 0 0 12px }
+.found .corner { border-color: #9ee2b4; box-shadow: 0 0 18px #9ee2b466 }
+.scanline { position: absolute; left: 10%; right: 10%; height: 2px; background: linear-gradient(90deg, transparent, #9ee2b4, transparent); animation: scan 2.4s ease-in-out infinite }
+.found .scanline { display: none }
+@keyframes scan { 0%, 100% { top: 12% } 50% { top: 86% } }
+.status { min-height: 22px; color: #8b968e; font-size: 14px; margin: 0 0 8px }
+.status.ok { color: #9ee2b4 }
+.status.err { color: #ff9d8f }
+.status.busy { color: #e6d59a }
+.result { text-align: left; background: #161b17; border: 1px solid #2b352e; border-radius: 18px; padding: 20px; margin-top: 18px }
+.result .head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px }
+.badge { font-size: 12px; padding: 6px 12px; border-radius: 999px; font-weight: 600 }
+.badge.ok { background: #173524; color: #9ee2b4 }
+.badge.warn { background: #3a3016; color: #e6c46a }
+button { border: 0; background: #2b352e; color: #e9f0eb; padding: 10px 16px; border-radius: 12px; font-size: 14px; cursor: pointer }
+button.primary { background: #9ee2b4; color: #102016; font-weight: 700; width: 100%; margin-top: 6px }
+pre { white-space: pre-wrap; word-break: break-all; color: #d7e0da; font: 13px/1.7 ui-monospace, "SF Mono", Menlo, monospace; background: #0d110e; border: 1px solid #2b352e; border-radius: 12px; padding: 14px; margin: 0 }
+details { margin-top: 14px }
+summary { cursor: pointer; color: #8b968e; font-size: 13px; padding: 4px 0 }
+table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px }
+th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #26302a; vertical-align: top }
+th { color: #7d8a81; font-weight: 500; white-space: nowrap; width: 110px }
+td { color: #d7e0da; word-break: break-all; font-family: ui-monospace, "SF Mono", Menlo, monospace }
