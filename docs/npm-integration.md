@@ -19,7 +19,7 @@
 @qccode/core
 ```
 
-`@qccode/*` 0.1.0 与 0.2.0 已发布到公共 npm registry；本文档及仓库源码对应生产版 0.3.0。npm 账号必须拥有 `qccode` scope 才能发布新版本。
+`@qccode/*` 0.1.0 与 0.2.0 已发布到公共 npm registry；本文档及仓库源码对应生产版 0.3.1。npm 账号必须拥有 `qccode` scope 才能发布新版本。
 
 ## 浏览器应用安装
 
@@ -238,7 +238,7 @@ pnpm release:npm
 
 ## 配置 GitHub OIDC 自动发布
 
-仓库提供 `.github/workflows/publish.yml`。推送完整 SemVer tag 时它会自动运行，并要求 tag 为 `v<version>`，例如 `v0.3.0`。`v1` 这类缩写不会触发发布。
+仓库提供 `.github/workflows/publish.yml`。推送完整 SemVer tag 时它会自动运行，并要求 tag 为 `v<version>`，例如 `v0.3.1`。`v1` 这类缩写不会触发发布。
 
 在 npmjs.com 的每个 `@qccode/*` package 页面打开 **Settings → Trusted Publisher**，分别添加：
 
@@ -254,7 +254,7 @@ Allowed action:    npm publish
 
 这些字段区分大小写。`Workflow filename` 只填 `publish.yml`，不要填 `.github/workflows/publish.yml`；不要填写 Environment，因为当前 workflow 没有使用 GitHub Environment。Node.js 24 和 npm 11 满足 Trusted Publishing 对 Node.js 22.14+、npm 11.5.1+ 的要求。OIDC 发布会自动生成 provenance，无需额外添加 `--provenance`，仓库也不应配置 `NPM_TOKEN`。
 
-如果 tag 触发的任务在 `Publish packages` 步骤失败，先检查失败时打印的第一个包，并确认该包也配置了上述 Trusted Publisher。完成设置后，无需修改版本或重建 tag：进入 GitHub 仓库的 **Actions → Publish npm packages → Run workflow**，Branch 选择包含修复的 `main`，tag 输入已有版本（例如 `v0.3.0`）即可重试。工作流会校验所选分支中的包版本与输入 tag 完全一致；发布脚本会查询 npm registry 并跳过已经发布成功的同版本包，因此可以安全重跑。
+如果 tag 触发的任务在 `Publish packages` 步骤失败，先检查失败时打印的第一个包，并确认该包也配置了上述 Trusted Publisher。完成设置后，无需修改版本或重建 tag：进入 GitHub 仓库的 **Actions → Publish npm packages → Run workflow**，Branch 选择包含修复的 `main`，tag 输入已有版本（例如 `v0.3.1`）即可重试。工作流会校验所选分支中的包版本与输入 tag 完全一致；发布脚本会查询 npm registry 并跳过已经发布成功的同版本包，因此可以安全重跑。
 
 后续发布流程：
 

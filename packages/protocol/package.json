@@ -1,6 +1,6 @@
 {
   "name": "@qccode/protocol",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "QCCode V1 envelope types, binary encoding, payload helpers, and Base64URL utilities.",
   "type": "module",
   "main": "./dist/index.js",
