@@ -176,3 +176,19 @@ export type QCCodeSymbol = {
   bootstrap: Uint8Array;
   dataRings: Uint8Array[];
 };
+
+/** Merge adjacent equal samples without moving their angular sampling centers. */
+export function arcRuns(bits: ArrayLike<number>): Array<{ start: number; end: number; value: number }> {
+  const runs: Array<{ start: number; end: number; value: number }> = [];
+  let boundary = 0;
+  while (boundary < bits.length && bits[boundary] === bits[(boundary + bits.length - 1) % bits.length]) boundary++;
+  if (boundary === bits.length) return bits.length ? [{ start: 0, end: bits.length - 1, value: bits[0]! }] : [];
+  for (let offset = 0; offset < bits.length; offset++) {
+    const slot = boundary + offset;
+    const value = bits[slot % bits.length]!;
+    const last = runs[runs.length - 1];
+    if (last && last.value === value) last.end = slot;
+    else runs.push({ start: slot, end: slot, value });
+  }
+  return runs;
+}

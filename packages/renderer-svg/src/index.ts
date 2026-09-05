@@ -1,4 +1,4 @@
-import type { QCCodeSymbol } from "@qccode/geometry";
+import { arcRuns, type QCCodeSymbol } from "@qccode/geometry";
 
 export type SvgRenderOptions = {
   size?: number;
@@ -6,7 +6,7 @@ export type SvgRenderOptions = {
   background?: string;
   dataBackground?: string;
   levels?: readonly [string, string, string, string];
-  center?: { mode: "none" } | { mode: "logo"; imageHref: string; scale?: number };
+  center?: { mode: "none" } | { mode: "logo"; imageHref: string; scale?: number; background?: string };
   title?: string;
 };
 
@@ -47,11 +47,11 @@ function dataArcDashes(bits: ArrayLike<number>, inner: number, outer: number, le
   const radius = (inner + outer) / 2;
   const pitch = Math.PI * 2 / bits.length;
   const markers: string[] = [];
-  for (let slot = 0; slot < bits.length; slot++) {
-    const value = bits[slot]!;
+  for (const run of arcRuns(bits)) {
+    const value = run.value;
     if (value === 0) continue;
-    const start = -Math.PI / 2 + (slot + 0.42) * pitch;
-    const end = -Math.PI / 2 + (slot + 0.58) * pitch;
+    const start = -Math.PI / 2 + (run.start + 0.42) * pitch;
+    const end = -Math.PI / 2 + (run.end + 0.58) * pitch;
     const [x1, y1] = point(radius, start), [x2, y2] = point(radius, end);
     markers.push(`<path d="M${x1.toFixed(3)} ${y1.toFixed(3)}A${radius.toFixed(3)} ${radius.toFixed(3)} 0 0 1 ${x2.toFixed(3)} ${y2.toFixed(3)}" fill="none" stroke="${escapeXml(levels[value] ?? levels[3]!)}" stroke-width="${(outer - inner).toFixed(3)}" stroke-linecap="round"/>`);
   }
@@ -77,8 +77,8 @@ export function renderSvg(symbol: QCCodeSymbol, options: SvgRenderOptions = {}):
   const size = options.size ?? 512;
   const foreground = options.foreground ?? "#000000";
   const background = options.background ?? "#FFFFFF";
-  const dataBackground = options.dataBackground ?? "#F1F3F2";
-  const levels = options.levels ?? [dataBackground, "#C6CCC8", "#737A76", foreground] as const;
+  const dataBackground = options.dataBackground ?? (symbol.layout.visualVersion === 2 ? "#FFFFFF" : "#F1F3F2");
+  const levels = options.levels ?? [dataBackground, symbol.layout.visualVersion === 2 ? "#BBBBBB" : "#C6CCC8", symbol.layout.visualVersion === 2 ? "#808080" : "#737A76", foreground] as const;
   const fgLum = colorLuminance(foreground), bgLum = colorLuminance(background);
   if (fgLum !== null && bgLum !== null) {
     const ratio = (Math.max(fgLum, bgLum) + 0.05) / (Math.min(fgLum, bgLum) + 0.05);
@@ -111,6 +111,7 @@ export function renderSvg(symbol: QCCodeSymbol, options: SvgRenderOptions = {}):
   if (center.mode === "logo") {
     const scale = Math.min(center.scale ?? 0.82, 0.82);
     const diameter = inner * 2 * scale;
+    if (center.background) paths.push(`<circle cx="128" cy="128" r="${inner * 0.9}" fill="${escapeXml(center.background)}"/>`);
     paths.push(`<image href="${escapeXml(center.imageHref)}" x="${128 - diameter / 2}" y="${128 - diameter / 2}" width="${diameter}" height="${diameter}" preserveAspectRatio="xMidYMid meet"/>`);
   }
   const title = escapeXml(options.title ?? "QCCode");

@@ -1147,3 +1147,22 @@ Scanner：
 - [ ] 已验证截图重放、并发兑换、过期和撤销场景。
 
 更底层的逐字节格式、RS、Bootstrap、Mask 和几何参数见[协议规范](./specification-v1.md)，安全假设见[安全模型](./security-model.md)，部署示例见[部署说明](./deployment.md)。
+
+### S1 连续圆头弧与自定义 Logo
+
+S1 默认使用白底、两级中性灰和黑色，相邻同值数据合并为连续圆头弧，采样位置与编码保持不变。最外侧完整定位圈仍用于扫描定位；此样式不是 Apple App Clip Code 格式。
+
+通过 `@qccode/sdk` 导出的 `renderSvg` 设置中心图标：
+
+```ts
+renderSvg(symbol, {
+  center: {
+    mode: "logo",
+    imageHref: "/brand-logo.svg", // 也可传入图片 data URL
+    scale: 0.72,
+    background: "#000000", // 可选圆形底色，适合白色 Logo
+  },
+});
+```
+
+Canvas 使用 `center: { mode: "logo", image, scale: 0.72, background: "#000000" }`，其中 `image` 是已加载的 `CanvasImageSource`。Logo 限制在中心安全区域内。Demo 支持 URL 或本地上传图片；替换图标会即时重绘，无需重新签发。

@@ -11,14 +11,14 @@ const root = document.querySelector<HTMLElement>("#app")!;
 root.innerHTML = `
   <header><div class="eyebrow">QCCODE / V1</div><h1>Signed data,<br><em>drawn in circles.</em></h1><p>服务端签名，显示端只编码。每一次验证都保留原始 Envelope。</p></header>
   <section class="workspace">
-    <form id="issue"><h2>01 / Server Control</h2><label>Mode<select name="mode"><option>REFERENCE</option><option>CHALLENGE</option><option>INLINE</option></select></label><label>Layout<select name="layout"><option>SPARSE</option><option>V1</option></select></label><label>Message Type<input name="messageType" type="number" value="1001"></label><label>Payload<textarea name="payload">{"action":"demo","device":"display-01"}</textarea></label><label>Center Logo URL · optional<input name="logo" value="/qccode-mark.svg"></label><div class="row"><label>Expires in seconds<input name="expiresIn" type="number" value="300"></label><label class="check"><input name="singleUse" type="checkbox" checked> Single use</label></div><button>Issue QCCode</button></form>
+    <form id="issue"><h2>01 / Server Control</h2><label>Mode<select name="mode"><option>REFERENCE</option><option>CHALLENGE</option><option>INLINE</option></select></label><label>Layout<select name="layout"><option>SPARSE</option><option>V1</option></select></label><label>Message Type<input name="messageType" type="number" value="1001"></label><label>Payload<textarea name="payload">{"action":"demo","device":"display-01"}</textarea></label><label>Center Logo URL · optional<input name="logo" value="/qccode-mark.svg"></label><label>上传中心图标<input id="logo-upload" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"></label><div class="row"><label>Expires in seconds<input name="expiresIn" type="number" value="300"></label><label class="check"><input name="singleUse" type="checkbox" checked> Single use</label></div><button>Issue QCCode</button></form>
     <article class="display"><div class="section-head"><h2>02 / Display Client</h2><span id="socket">CONNECTING</span></div><div id="symbol" class="symbol"><div class="placeholder">Waiting for<br>signed envelope</div></div><div id="meta" class="meta"></div></article>
     <article class="scanner"><h2>03 / Scanner Verification</h2><div class="checks"><div>Visual decode <b id="visual">—</b></div><div>Cryptographic signature <b id="signature">—</b></div><div>Issuer trust <b id="issuer">—</b></div><div>Time validation <b id="time">—</b></div></div><video id="camera" playsinline muted></video><div class="scanner-actions"><button id="camera-start" type="button">Start camera</button><button id="camera-scan" type="button" disabled>Scan frame</button></div><label class="upload">Scan image<input id="image-upload" type="file" accept="image/*"></label><button id="redeem" disabled>Submit original Envelope</button></article>
     <article class="result"><h2>04 / Result</h2><strong id="result">NO RESULT</strong><pre id="details"></pre></article>
   </section>`;
 
 let currentEnvelope = "";
-let currentLogo = "";
+let currentLogo = "/qccode-mark.svg";
 let scannerPromise: Promise<QCCodeScanner> | undefined;
 
 function getScanner(): Promise<QCCodeScanner> {
@@ -54,8 +54,8 @@ async function showScan(scan: Awaited<ReturnType<QCCodeScanner["scanCanvas"]>>):
   }
 }
 
-async function display(envelopeBase64Url: string): Promise<void> {
-  if (currentEnvelope === envelopeBase64Url) return;
+async function display(envelopeBase64Url: string, force = false): Promise<void> {
+  if (!force && currentEnvelope === envelopeBase64Url) return;
   currentEnvelope = envelopeBase64Url;
   const bytes = fromBase64Url(envelopeBase64Url);
   const envelope = isBearerEnvelope(bytes) ? parseBearerEnvelope(bytes) : parseEnvelope(bytes);
@@ -115,4 +115,21 @@ document.querySelector<HTMLInputElement>("#image-upload")!.addEventListener("cha
   canvas.height = bitmap.height;
   canvas.getContext("2d")!.drawImage(bitmap, 0, 0);
   await showScan(await (await getScanner()).scanCanvas(canvas));
+});
+
+const logoInput = document.querySelector<HTMLInputElement>('input[name="logo"]')!;
+logoInput.addEventListener("change", () => {
+  currentLogo = logoInput.value.trim();
+  if (currentEnvelope) void display(currentEnvelope, true);
+});
+document.querySelector<HTMLInputElement>("#logo-upload")!.addEventListener("change", async (event) => {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    currentLogo = String(reader.result);
+    logoInput.value = currentLogo;
+    if (currentEnvelope) void display(currentEnvelope, true);
+  });
+  reader.readAsDataURL(file);
 });

@@ -1,4 +1,4 @@
-import type { QCCodeSymbol } from "@qccode/geometry";
+import { arcRuns, type QCCodeSymbol } from "@qccode/geometry";
 
 export type CanvasRenderOptions = {
   size?: number;
@@ -6,7 +6,7 @@ export type CanvasRenderOptions = {
   background?: string;
   dataBackground?: string;
   levels?: readonly [string, string, string, string];
-  center?: { mode: "none" } | { mode: "logo"; image: CanvasImageSource; scale?: number };
+  center?: { mode: "none" } | { mode: "logo"; image: CanvasImageSource; scale?: number; background?: string };
 };
 
 function drawRing(ctx: CanvasRenderingContext2D, bits: ArrayLike<number>, inner: number, outer: number, levels?: readonly [string, string, string, string], zeroStyle?: string): void {
@@ -49,11 +49,11 @@ function drawDataDashes(ctx: CanvasRenderingContext2D, bits: ArrayLike<number>, 
   const pitch = Math.PI * 2 / bits.length;
   ctx.lineCap = "round";
   ctx.lineWidth = outer - inner;
-  for (let slot = 0; slot < bits.length; slot++) {
-    const value = bits[slot]!;
+  for (const run of arcRuns(bits)) {
+    const value = run.value;
     if (value === 0) continue;
-    const start = -Math.PI / 2 + (slot + 0.42) * pitch;
-    const end = -Math.PI / 2 + (slot + 0.58) * pitch;
+    const start = -Math.PI / 2 + (run.start + 0.42) * pitch;
+    const end = -Math.PI / 2 + (run.end + 0.58) * pitch;
     ctx.strokeStyle = levels[value]!;
     ctx.beginPath();
     ctx.arc(128, 128, radius, start, end);
@@ -65,8 +65,8 @@ export function renderCanvas(symbol: QCCodeSymbol, canvas: HTMLCanvasElement | O
   const size = options.size ?? 512;
   const foreground = options.foreground ?? "#000000";
   const background = options.background ?? "#FFFFFF";
-  const dataBackground = options.dataBackground ?? "#F1F3F2";
-  const levels = options.levels ?? [dataBackground, "#C6CCC8", "#737A76", foreground] as const;
+  const dataBackground = options.dataBackground ?? (symbol.layout.visualVersion === 2 ? "#FFFFFF" : "#F1F3F2");
+  const levels = options.levels ?? [dataBackground, symbol.layout.visualVersion === 2 ? "#BBBBBB" : "#C6CCC8", symbol.layout.visualVersion === 2 ? "#808080" : "#737A76", foreground] as const;
   canvas.width = size;
   canvas.height = size;
   const context = canvas.getContext("2d");
@@ -98,6 +98,12 @@ export function renderCanvas(symbol: QCCodeSymbol, canvas: HTMLCanvasElement | O
   });
   const center = options.center ?? { mode: "none" };
   if (center.mode === "logo") {
+    if (center.background) {
+      ctx.fillStyle = center.background;
+      ctx.beginPath();
+      ctx.arc(128, 128, inner * 0.9, 0, Math.PI * 2);
+      ctx.fill();
+    }
     const diameter = inner * 2 * Math.min(center.scale ?? 0.82, 0.82);
     ctx.save();
     ctx.beginPath();

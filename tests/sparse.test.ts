@@ -63,6 +63,15 @@ describe("sparse S1 layout", () => {
     const symbol = encodeQCCode(bearerEnvelope());
     const svg = renderSvg(symbol);
     expect(svg).toContain("stroke-linecap=\"round\"");
-    expect(svg).toContain("#C6CCC8");
+    expect(svg).toContain("#BBBBBB");
   });
+});
+
+it("merges matching samples across the angular seam", async () => {
+  const { arcRuns } = await import("../packages/geometry/src/index.js");
+  expect(arcRuns([3, 3, 0, 2, 3])).toEqual([
+    { start: 2, end: 2, value: 0 },
+    { start: 3, end: 3, value: 2 },
+    { start: 4, end: 6, value: 3 },
+  ]);
 });
