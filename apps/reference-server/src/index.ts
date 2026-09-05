@@ -42,7 +42,10 @@ app.post("/qccode/v1/issue", async (request, response) => {
   try {
     const mode = QCCodeMode[String(request.body.mode ?? "REFERENCE").toUpperCase() as keyof typeof QCCodeMode];
     if (typeof mode !== "number") throw new Error("invalid mode");
-    const sparse = String(request.body.layout ?? "SPARSE").toUpperCase() === "SPARSE";
+    const layout = String(request.body.layout ?? "AUTO").toUpperCase();
+    if (!["AUTO", "C1", "C2", "C3", "S1", "SPARSE", "V1"].includes(layout)) throw new Error("invalid layout");
+    const sparse = layout !== "V1";
+    if (["S1", "SPARSE"].includes(layout) && mode !== QCCodeMode.REFERENCE) throw new Error("S1 requires REFERENCE mode");
     if (sparse && mode === QCCodeMode.REFERENCE) {
       const resourceId = crypto.getRandomValues(new Uint8Array(12));
       const issued = await qcCode.issueBearer({

@@ -11,7 +11,8 @@ import {
 } from "@qccode/geometry";
 import { BEARER_ENVELOPE_BYTES, isBearerEnvelope, parseBearerEnvelope, parseEnvelope } from "@qccode/protocol";
 
-export type EncodeOptions = { version?: "auto" | LayoutId };
+export type EncodeOptions = { layout?: "auto" | LayoutId; version?: "auto" | LayoutId };
+export type { LayoutId } from "@qccode/geometry";
 
 export function maximumEnvelopeBytes(layout: QCCodeLayout): number {
   return layout.visualVersion === 2 ? BEARER_ENVELOPE_BYTES : layout.rsBlocks * layout.rsDataBytes - 12;
@@ -20,6 +21,7 @@ export function maximumEnvelopeBytes(layout: QCCodeLayout): number {
 export function selectLayout(envelopeLength: number, requested: "auto" | LayoutId = "auto"): QCCodeLayout {
   if (requested !== "auto") {
     const layout = LAYOUTS[requested];
+    if (!layout) throw new Error(`unknown layout: ${requested}`);
     if (envelopeLength > maximumEnvelopeBytes(layout)) throw new Error(`envelope does not fit ${requested}`);
     return layout;
   }
@@ -92,7 +94,10 @@ export function encodeQCCode(envelope: Uint8Array, options: EncodeOptions = {}):
   const bearer = isBearerEnvelope(envelope);
   if (bearer) parseBearerEnvelope(envelope);
   else parseEnvelope(envelope);
-  const layout = bearer ? LAYOUTS.S1 : selectLayout(envelope.length, options.version ?? "auto");
+  if (options.layout !== undefined && options.version !== undefined && options.layout !== options.version) throw new Error("conflicting layout and version options");
+  const requested = options.layout ?? options.version ?? "auto";
+  if (!bearer && requested === "S1") throw new Error("S1 requires a bearer envelope; signed envelopes require C1, C2 or C3");
+  const layout = bearer && requested === "auto" ? LAYOUTS.S1 : selectLayout(envelope.length, requested);
   let best: { mask: number; rings: Uint8Array[]; penalty: number } | undefined;
   for (let mask = 0; mask < 8; mask++) {
     const frame = createVisualFrame(envelope, layout, mask);

@@ -132,3 +132,7 @@ Key lookup uses `(issuerId,keyId)`. New messages use the current key; previous k
 Single-use redemption MUST atomically claim `(issuerId,messageId)` before performing the protected operation. Implementations SHOULD also detect nonce reuse. Database adapters use a transaction and unique constraint. Redis adapters use one atomic script or `SET NX` plus a durable idempotent business workflow.
 
 V1 provides authenticity, integrity, visual error recovery, and online replay control. It does not provide payload confidentiality, anonymous credentials, zero-knowledge proofs, post-quantum signatures, multisignatures, blockchain integration, or NFC.
+
+## Explicit layout selection
+
+Encoders may place a 48-byte bearer envelope in a C1/C2/C3 visual frame using the existing V1 header, length, CRC and padding rules. After validating the visual frame, decoders distinguish bearer (`c4 02`) from signed envelope magic and invoke the corresponding strict parser. This does not add a signature to bearer data or change its server-verification requirement. Older decoders that assume all V1 visual frames carry signed envelopes do not support this combination. S1 remains bearer-only. Automatic selection preserves the prior signed-to-C and bearer-to-S1 defaults; explicit layout options override automatic selection subject to capacity.

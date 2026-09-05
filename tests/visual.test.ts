@@ -55,3 +55,19 @@ describe("visual protocol", () => {
     expect(logoSvg).toContain("#F1F3F2");
   });
 });
+
+it("honors signed layout selection and rejects incompatible capacity", async () => {
+  const envelope = await inlineEnvelope(32);
+  for (const layout of ["C1", "C2", "C3"] as const) {
+    const symbol = encodeQCCode(envelope, { layout });
+    expect(symbol.layout.id).toBe(layout);
+    expect(decodeIdealSymbol(symbol).envelopeBytes).toEqual(envelope);
+  }
+  expect(() => encodeQCCode(envelope, { layout: "S1" })).toThrow("S1 requires a bearer");
+  expect(() => encodeQCCode(new Uint8Array(), { layout: "C1" })).toThrow();
+  expect(() => encodeQCCode(envelope, { layout: "invalid" as "C1" })).toThrow("unknown layout");
+  expect(() => encodeQCCode(envelope, { layout: "C1", version: "C2" })).toThrow("conflicting");
+  expect(() => encodeQCCode(envelope, { layout: "auto" })).not.toThrow();
+  const larger = await inlineEnvelope(50);
+  expect(() => encodeQCCode(larger, { layout: "C1" })).toThrow("does not fit");
+});

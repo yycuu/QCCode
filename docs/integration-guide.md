@@ -1191,3 +1191,20 @@ try {
 底层 `decodeImageData(image, options)` 可配置 `maxCorrections`（默认 12，范围 1–81）、`correctionOffset` 及 `previousCorrection`，结果增加 `bounds` 和 `correction`。静态图片可提高 `maxCorrections` 扩大搜索，但会增加同步处理耗时；无校正及已缓存参数另行优先尝试。
 
 限制：这不是通用透视识别器。未实现任意旋转椭圆拟合或完整单应矩阵恢复；断裂、与背景相连、严重遮挡或模糊的外环仍可能失败。当前回归覆盖合成边框/文字背景、轻微纵向透视以及负样本，未把外部项目的实拍回放成功率作为 SDK 实测结果。
+
+### 配置和切换码布局（v0.3.2）
+
+```ts
+import { encodeQCCode, renderSvg } from "@qccode/sdk";
+
+const symbol = encodeQCCode(envelopeBytes, { layout: "C2" });
+const svg = renderSvg(symbol);
+```
+
+`layout` 支持 `"auto" | "C1" | "C2" | "C3" | "S1"`。不传或使用 `auto` 时，Bearer 默认 S1，签名 Envelope 自动选择能容纳内容的最小 C 布局。显式配置始终生效，容量不足时抛错，不会静默改成其他布局。旧参数 `version` 仍可使用；同时传入两个不一致的参数会报错。
+
+- `issueBearer()` 返回的同一份 48 字节数据可切换到任意四种布局，无需重新签发；安全属性仍是 Bearer，必须服务端核销。
+- `issue()` 返回的签名数据可选择容量足够的 C1/C2/C3；S1 无法容纳签名 Envelope，会明确报错。
+- Demo 提供 AUTO/C1/C2/C3/S1 选择器，可直接重绘当前数据。参考服务保留 SPARSE、V1 旧配置别名；REFERENCE 配合 AUTO/C1/C2/C3/S1 签发 Bearer，V1 签发旧签名格式。
+
+C 布局承载 Bearer 需要本次更新后的解码器。此前只在 C 布局解析签名 Envelope 的 SDK 无法解码这种组合；更新显示端与扫描端 SDK 后再启用。

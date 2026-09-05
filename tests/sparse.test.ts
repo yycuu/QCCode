@@ -75,3 +75,15 @@ it("merges matching samples across the angular seam", async () => {
     { start: 4, end: 6, value: 3 },
   ]);
 });
+
+it.each(["C1", "C2", "C3", "S1"] as const)("honors explicit bearer layout %s", (layout) => {
+  const envelope = bearerEnvelope();
+  const symbol = encodeQCCode(envelope, { layout });
+  expect(symbol.layout.id).toBe(layout);
+  expect(decodeIdealSymbol(symbol).envelopeBytes).toEqual(envelope);
+  expect(encodeQCCode(envelope, { version: layout }).layout.id).toBe(layout);
+});
+
+it("rejects conflicting layout options", () => {
+  expect(() => encodeQCCode(bearerEnvelope(), { layout: "C1", version: "S1" })).toThrow("conflicting");
+});

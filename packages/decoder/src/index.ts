@@ -1,6 +1,6 @@
 import { bitsToBytes, crc32c, maskSymbol, reedSolomonDecode } from "@qccode/core";
 import { decodeBootstrap, logicalToPhysicalIndex, physicalIndexToSlot, physicalToLogicalIndex, type QCCodeSymbol } from "@qccode/geometry";
-import { BEARER_ENVELOPE_BYTES, equalBytes, parseBearerEnvelope, parseEnvelope, type BearerEnvelope, type EnvelopeV1 } from "@qccode/protocol";
+import { BEARER_ENVELOPE_BYTES, equalBytes, isBearerEnvelope, parseBearerEnvelope, parseEnvelope, type BearerEnvelope, type EnvelopeV1 } from "@qccode/protocol";
 
 export type IdealDecodeResult = {
   envelopeBytes: Uint8Array;
@@ -52,7 +52,7 @@ function decodeSymbol(symbol: QCCodeSymbol, unknownPhysicalSlots: readonly numbe
     if (crc32c(frame.slice(0, 8 + envelopeLength)) !== expectedCrc) throw new Error("CRC_FAILED");
     if (!frame.slice(12 + envelopeLength).every((byte) => byte === 0)) throw new Error("PROTOCOL_INVALID");
     envelopeBytes = frame.slice(8, 8 + envelopeLength);
-    envelope = parseEnvelope(envelopeBytes);
+    envelope = isBearerEnvelope(envelopeBytes) ? parseBearerEnvelope(envelopeBytes) : parseEnvelope(envelopeBytes);
   }
   if (!equalBytes(envelope.bytes, envelopeBytes)) throw new Error("PROTOCOL_INVALID");
   return {
