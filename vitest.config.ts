@@ -12,6 +12,7 @@ export default defineConfig({
       "@qccode/geometry": `${root}packages/geometry/src/index.ts`,
       "@qccode/encoder": `${root}packages/encoder/src/index.ts`,
       "@qccode/decoder": `${root}packages/decoder/src/index.ts`,
+      "@qccode/vision": `${root}packages/vision/src/index.ts`,
       "@qccode/renderer-svg": `${root}packages/renderer-svg/src/index.ts`,
     },
   },

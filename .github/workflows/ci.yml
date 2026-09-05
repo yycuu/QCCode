@@ -33,11 +33,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Run tests without build output
+        run: pnpm test
+
       - name: Build TypeScript packages
         run: pnpm build
-
-      - name: Run tests
-        run: pnpm test
 
       - name: Regenerate golden vectors
         run: pnpm vectors
