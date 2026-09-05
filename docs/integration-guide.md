@@ -48,7 +48,7 @@ Server
 
 ## 2. 仓库与包
 
-当前项目是 pnpm TypeScript monorepo。`@qccode/*` 0.1.0 与 0.2.0 已发布到公共 npm registry；仓库中的生产集成接口版本为 0.3.2。仓库内部通过 `workspace:*` 引用。
+当前项目是 pnpm TypeScript monorepo。`@qccode/*` 0.1.0 与 0.2.0 已发布到公共 npm registry；仓库中的生产集成接口版本为 0.3.3。仓库内部通过 `workspace:*` 引用。
 
 | 包 | 用途 |
 |---|---|
@@ -1192,7 +1192,7 @@ try {
 
 限制：这不是通用透视识别器。未实现任意旋转椭圆拟合或完整单应矩阵恢复；断裂、与背景相连、严重遮挡或模糊的外环仍可能失败。当前回归覆盖合成边框/文字背景、轻微纵向透视以及负样本，未把外部项目的实拍回放成功率作为 SDK 实测结果。
 
-### 配置和切换码布局（v0.3.2）
+### 配置和切换码布局（v0.3.3）
 
 ```ts
 import { encodeQCCode, renderSvg } from "@qccode/sdk";

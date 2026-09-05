@@ -1,6 +1,6 @@
 {
   "name": "@qccode/encoder",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Encode signed QCCode envelopes into circular visual symbols.",
   "type": "module",
   "main": "./dist/index.js",
