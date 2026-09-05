@@ -1,6 +1,6 @@
 {
   "name": "@qccode/renderer-canvas",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Render QCCode symbols to HTML Canvas and OffscreenCanvas.",
   "type": "module",
   "main": "./dist/index.js",

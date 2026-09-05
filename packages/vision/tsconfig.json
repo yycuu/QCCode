@@ -2,5 +2,5 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "outDir": "dist", "rootDir": "src", "lib": ["ES2022", "DOM"] },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../geometry" }]
+  "references": [{ "path": "../geometry" }, { "path": "../decoder" }]
 }

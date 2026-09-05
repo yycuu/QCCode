@@ -1,7 +1,9 @@
 import { decodeSampledSymbol } from "@qccode/decoder";
 import { verifyBearerEnvelope, verifyEnvelopeOffline, type BearerVerificationResult, type QCCodeTrustStore, type OfflineVerificationResult } from "@qccode/security";
 import { isBearerEnvelope } from "@qccode/protocol";
-import { decodeImageData, type VisionDecodeResult } from "@qccode/vision";
+import { decodeImageData, type Correction, type VisionDecodeResult } from "@qccode/vision";
+
+export { VisionDecodeError } from "@qccode/vision";
 
 export type QCCodeScanResult = {
   visual: VisionDecodeResult;
@@ -11,11 +13,16 @@ export type QCCodeScanResult = {
 
 export class QCCodeScanner {
   #stream: MediaStream | undefined;
+  #correction: Correction | undefined;
+  #correctionOffset = 0;
 
   constructor(readonly trustStore: QCCodeTrustStore) {}
 
   async scanImageData(image: ImageData): Promise<QCCodeScanResult> {
-    const visual = decodeImageData(image);
+    const offset = this.#correctionOffset;
+    this.#correctionOffset = (offset + 12) % 81;
+    const visual = decodeImageData(image, { correctionOffset: offset, ...(this.#correction ? { previousCorrection: this.#correction } : {}) });
+    this.#correction = visual.correction;
     const decoded = decodeSampledSymbol(visual.symbol, visual.unknownPhysicalSlots);
     const security = isBearerEnvelope(decoded.envelopeBytes)
       ? verifyBearerEnvelope(decoded.envelopeBytes)
@@ -42,11 +49,13 @@ export class QCCodeScanner {
   }
 
   async scanVideoFrame(video: HTMLVideoElement, canvas = document.createElement("canvas")): Promise<QCCodeScanResult> {
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) throw new Error("VIDEO_FRAME_UNAVAILABLE");
+    const scale = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight));
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
     const context = canvas.getContext("2d");
     if (!context) throw new Error("2D Canvas is unavailable");
-    context.drawImage(video, 0, 0);
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
     return this.scanCanvas(canvas);
   }
 }

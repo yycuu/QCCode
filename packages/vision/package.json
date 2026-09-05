@@ -1,6 +1,6 @@
 {
   "name": "@qccode/vision",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Computer vision candidate detection and luminance sampling for QCCode.",
   "type": "module",
   "main": "./dist/index.js",
@@ -41,7 +41,8 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@qccode/geometry": "workspace:*"
+    "@qccode/geometry": "workspace:*",
+    "@qccode/decoder": "workspace:*"
   },
   "license": "MIT"
 }

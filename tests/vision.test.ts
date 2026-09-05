@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { encodeQCCode } from "../packages/encoder/src/index.js";
 import { QCCodeFlag, QCCodeMode, encodeBearerEnvelope } from "../packages/protocol/src/index.js";
 import { issueEnvelope, privateKeyFromSeed } from "../packages/security/src/index.js";
+import { decodeSampledSymbol } from "../packages/decoder/src/index.js";
 import { decodeImageData } from "../packages/vision/src/index.js";
 
 const hex = (value: string) => Uint8Array.from(value.match(/../gu) ?? [], (pair) => Number.parseInt(pair, 16));
@@ -114,4 +115,65 @@ describe("vision pipeline", () => {
     expect(result.symbol.dataRings).toEqual(symbol.dataRings);
     expect(result.symbol.visualVersion).toBe(2);
   });
+});
+
+function bearerFixture() {
+  return encodeQCCode(encodeBearerEnvelope({
+    issuerId: new Uint8Array(8).fill(1), messageType: 1001,
+    messageId: new Uint8Array(12).fill(2), issuedAt: 100, expiresAt: 200,
+    resourceType: 7, resourceId: new Uint8Array(12).fill(3),
+  }));
+}
+
+function cameraScene(q = 0, shear = 0) {
+  const source = rasterizeSymbol(bearerFixture());
+  const width = 1400, height = 1100;
+  const data = new Uint8ClampedArray(width * height * 4).fill(255);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    let gray = 255;
+    // Monitor edge, unrelated text-like bars, and dock outside the code.
+    if (x < 18 || y > 1060 || (y > 25 && y < 48 && x > 250 && x < 1200)) gray = 0;
+    const u = (x - 750) / 452, v = (y - 550) / 452;
+    const sy = (v - q) / (1 - q * v);
+    const sx = (u - shear * sy) * (1 + q * sy) / Math.sqrt(1 - q * q);
+    const px = Math.round(460 + sx * 452), py = Math.round(460 + sy * 452);
+    if (px >= 0 && px < source.width && py >= 0 && py < source.height) gray = source.data[(py * source.width + px) * 4]!;
+    const offset = (y * width + x) * 4;
+    data[offset] = data[offset + 1] = data[offset + 2] = gray;
+  }
+  return { width, height, data } as ImageData;
+}
+
+it("locates an independent ring despite dark monitor edges and text", () => {
+  const result = decodeImageData(cameraScene());
+  expect(result.symbol.dataRings).toEqual(bearerFixture().dataRings);
+  expect(result.bounds.x).toBeGreaterThan(250);
+});
+
+it("recovers mild bounded projective distortion with CRC validation", () => {
+  const result = decodeImageData(cameraScene(.04), { maxCorrections: 27 });
+  expect(decodeSampledSymbol(result.symbol, result.unknownPhysicalSlots).envelopeBytes).toEqual(decodeSampledSymbol(bearerFixture(), []).envelopeBytes);
+});
+
+it("rejects blank images and unrelated dark rectangles", () => {
+  const width = 200, height = 200;
+  const data = new Uint8ClampedArray(width * height * 4).fill(255);
+  expect(() => decodeImageData({ width, height, data } as ImageData)).toThrow("VISUAL_CANDIDATE_NOT_FOUND");
+  for (let y = 30; y < 170; y++) for (let x = 30; x < 170; x++) {
+    const i = (y * width + x) * 4;
+    data[i] = data[i + 1] = data[i + 2] = 0;
+  }
+  expect(() => decodeImageData({ width, height, data } as ImageData)).toThrow("VISUAL_CANDIDATE_NOT_FOUND");
+});
+
+it("rejects an unrelated closed ring after candidate detection", () => {
+  const width = 200, height = 200;
+  const data = new Uint8ClampedArray(width * height * 4).fill(255);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const radius = Math.hypot(x - 100, y - 100);
+    if (radius < 70 || radius > 76) continue;
+    const i = (y * width + x) * 4;
+    data[i] = data[i + 1] = data[i + 2] = 0;
+  }
+  expect(() => decodeImageData({ width, height, data } as ImageData, { maxCorrections: 1 })).toThrow("VISUAL_ORIENTATION_FAILED");
 });

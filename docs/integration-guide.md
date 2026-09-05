@@ -48,7 +48,7 @@ Server
 
 ## 2. 仓库与包
 
-当前项目是 pnpm TypeScript monorepo。`@qccode/*` 0.1.0 与 0.2.0 已发布到公共 npm registry；仓库中的生产集成接口版本为 0.3.1。仓库内部通过 `workspace:*` 引用。
+当前项目是 pnpm TypeScript monorepo。`@qccode/*` 0.1.0 与 0.2.0 已发布到公共 npm registry；仓库中的生产集成接口版本为 0.3.2。仓库内部通过 `workspace:*` 引用。
 
 | 包 | 用途 |
 |---|---|
@@ -1166,3 +1166,28 @@ renderSvg(symbol, {
 ```
 
 Canvas 使用 `center: { mode: "logo", image, scale: 0.72, background: "#000000" }`，其中 `image` 是已加载的 `CanvasImageSource`。Logo 限制在中心安全区域内。Demo 支持 URL 或本地上传图片；替换图标会即时重绘，无需重新签发。
+
+### 摄像头定位、透视尝试和诊断
+
+扫描器先在缩小的灰度图上寻找独立连通区域，再对候选区域单独计算亮度阈值。不会再将全图文字、边框和码环合成一个外接矩形。最多保留 6 个候选，优先尝试无校正采样，随后尝试有限的纵向透视与剪切参数；每个候选必须通过 RS、CRC 和协议解析才能返回。签名、信任、时效及服务端核销仍走原有验证流程，CRC 成功不代表业务授权成功。
+
+`QCCodeScanner` 会记住上次成功的校正参数，并在多次扫描之间推进搜索位置。应复用同一个 scanner，按顺序调用、捕获单帧失败后继续下一帧，不要并发积压扫描请求。`scanVideoFrame` 将长边限制在 1280 像素，未就绪的视频抛出 `VIDEO_FRAME_UNAVAILABLE`。当前仍会每帧重新定位，不缓存码的位置。
+
+```ts
+import { VisionDecodeError } from "@qccode/sdk";
+
+try {
+  const result = await scanner.scanVideoFrame(video);
+  // 继续检查 result.security，并按业务流程提交原始 envelope。
+} catch (error) {
+  if (error instanceof VisionDecodeError) {
+    console.debug(error.stage, error.candidates, error.attempts);
+  }
+}
+```
+
+`stage` 为 `detection`、`orientation`、`bootstrap` 或 `data`，表示尝试达到的最深失败阶段，`cause` 保留具体错误。旧的直接匹配 `ORIENTATION_AMBIGUOUS` 等错误消息的代码应改用这些字段。
+
+底层 `decodeImageData(image, options)` 可配置 `maxCorrections`（默认 12，范围 1–81）、`correctionOffset` 及 `previousCorrection`，结果增加 `bounds` 和 `correction`。静态图片可提高 `maxCorrections` 扩大搜索，但会增加同步处理耗时；无校正及已缓存参数另行优先尝试。
+
+限制：这不是通用透视识别器。未实现任意旋转椭圆拟合或完整单应矩阵恢复；断裂、与背景相连、严重遮挡或模糊的外环仍可能失败。当前回归覆盖合成边框/文字背景、轻微纵向透视以及负样本，未把外部项目的实拍回放成功率作为 SDK 实测结果。
