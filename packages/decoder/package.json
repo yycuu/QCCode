@@ -1,6 +1,6 @@
 {
   "name": "@qccode/decoder",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "QCCode symbol decoder with error and erasure correction.",
   "type": "module",
   "main": "./dist/index.js",

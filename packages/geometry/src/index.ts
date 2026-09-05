@@ -1,5 +1,12 @@
-/** C1/C2/C3 are deprecated as of v0.3.5 and will be removed in a future release. Use S1. */
-export type LayoutId = "C1" | "C2" | "C3" | "S1";
+/** @deprecated C1 is deprecated as of v0.3.5 and will be removed in a future release. Use S1. */
+export type C1LayoutId = "C1";
+/** @deprecated C2 is deprecated as of v0.3.5 and will be removed in a future release. Use S1. */
+export type C2LayoutId = "C2";
+/** @deprecated C3 is deprecated as of v0.3.5 and will be removed in a future release. Use S1. */
+export type C3LayoutId = "C3";
+export type S1LayoutId = "S1";
+export type DeprecatedLayoutId = C1LayoutId | C2LayoutId | C3LayoutId;
+export type LayoutId = DeprecatedLayoutId | S1LayoutId;
 
 export type QCCodeLayout = {
   id: LayoutId;
@@ -16,7 +23,17 @@ export type QCCodeLayout = {
   rsCodewordBytes: number;
 };
 
-export const LAYOUTS: Readonly<Record<LayoutId, QCCodeLayout>> = {
+export type QCCodeLayouts = {
+  /** @deprecated C1 will be removed in a future release. Use S1. */
+  readonly C1: QCCodeLayout;
+  /** @deprecated C2 will be removed in a future release. Use S1. */
+  readonly C2: QCCodeLayout;
+  /** @deprecated C3 will be removed in a future release. Use S1. */
+  readonly C3: QCCodeLayout;
+  readonly S1: QCCodeLayout;
+};
+
+export const LAYOUTS: QCCodeLayouts = {
   C1: {
     id: "C1", numericId: 1, visualVersion: 1, rsBlocks: 1,
     ringSlots: [140, 152, 164, 176, 188, 200],
@@ -42,6 +59,15 @@ export const LAYOUTS: Readonly<Record<LayoutId, QCCodeLayout>> = {
     rsDataBytes: 54, rsParityBytes: 32, rsCodewordBytes: 86,
   },
 };
+
+const warnedDeprecatedLayouts = new Set<DeprecatedLayoutId>();
+
+export function warnDeprecatedLayout(layout: LayoutId | QCCodeLayout): void {
+  const id = typeof layout === "string" ? layout : layout.id;
+  if (id === "S1" || warnedDeprecatedLayouts.has(id)) return;
+  warnedDeprecatedLayouts.add(id);
+  console.warn(`[QCCode] ${id} is deprecated as of v0.3.5 and will be removed in a future release. Migrate to S1 using server-issued bearer envelopes and online redemption; S1 does not support signed envelopes or offline verification.`);
+}
 
 for (const layout of Object.values(LAYOUTS)) {
   const actual = layout.ringSlots.reduce((sum, count) => sum + count, 0);

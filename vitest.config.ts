@@ -14,6 +14,8 @@ export default defineConfig({
       "@qccode/decoder": `${root}packages/decoder/src/index.ts`,
       "@qccode/vision": `${root}packages/vision/src/index.ts`,
       "@qccode/renderer-svg": `${root}packages/renderer-svg/src/index.ts`,
+      "@qccode/renderer-canvas": `${root}packages/renderer-canvas/src/index.ts`,
+      "@qccode/scanner": `${root}packages/scanner/src/index.ts`,
     },
   },
 });

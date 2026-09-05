@@ -1,6 +1,6 @@
 {
   "name": "@qccode/server-sdk",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "Server-side QCCode issuing, resolving, revocation, and replay protection.",
   "type": "module",
   "main": "./dist/index.js",

@@ -19,7 +19,7 @@
 @qccode/core
 ```
 
-`@qccode/*` 0.1.0 与 0.2.0 已发布到公共 npm registry；本文档及仓库源码对应生产版 0.3.5。npm 账号必须拥有 `qccode` scope 才能发布新版本。
+`@qccode/*` 0.1.0 与 0.2.0 已发布到公共 npm registry；本文档及仓库源码对应生产版 0.3.6。npm 账号必须拥有 `qccode` scope 才能发布新版本。
 
 v0.3.5 起 C1/C2/C3 已废弃，将在后续版本移除，建议迁移到 S1。SDK 会对旧格式输出英文控制台警告；下文签名码示例仅用于存量集成。迁移到 S1 需要 Bearer Envelope 和在线核销，详见[生产集成指南](./production-integration.md#v035-弃用与迁移)。
 

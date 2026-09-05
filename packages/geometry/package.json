@@ -1,6 +1,6 @@
 {
   "name": "@qccode/geometry",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "QCCode V1 layouts, ring geometry, orientation, and bootstrap definitions.",
   "type": "module",
   "main": "./dist/index.js",

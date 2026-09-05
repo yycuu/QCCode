@@ -1,6 +1,6 @@
 # QCCode 生产环境完整集成指南
 
-本文对应 `@qccode/server-sdk` 0.3.5 和 `@qccode/sdk` 0.3.5。目标依赖结构是：
+本文对应 `@qccode/server-sdk` 0.3.6 和 `@qccode/sdk` 0.3.6。目标依赖结构是：
 
 ```bash
 # 服务器：QCCode 只安装一个包

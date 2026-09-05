@@ -5,6 +5,7 @@ import {
   logicalToPhysicalIndex,
   ORIENTATION_BITS,
   physicalIndexToSlot,
+  warnDeprecatedLayout,
   type QCCodeLayout,
   type QCCodeSymbol,
   type LayoutId,
@@ -19,8 +20,6 @@ export type EncodeOptions = {
 };
 export type { LayoutId } from "@qccode/geometry";
 
-let warnedDeprecatedLayout = false;
-
 export function maximumEnvelopeBytes(layout: QCCodeLayout): number {
   return layout.visualVersion === 2 ? BEARER_ENVELOPE_BYTES : layout.rsBlocks * layout.rsDataBytes - 12;
 }
@@ -30,10 +29,12 @@ export function selectLayout(envelopeLength: number, requested: "auto" | LayoutI
     const layout = LAYOUTS[requested];
     if (!layout) throw new Error(`unknown layout: ${requested}`);
     if (envelopeLength > maximumEnvelopeBytes(layout)) throw new Error(`envelope does not fit ${requested}`);
+    warnDeprecatedLayout(layout);
     return layout;
   }
   const layout = Object.values(LAYOUTS).find((candidate) => candidate.visualVersion === 1 && envelopeLength <= maximumEnvelopeBytes(candidate));
   if (!layout) throw new Error("envelope exceeds C3; use REFERENCE mode");
+  warnDeprecatedLayout(layout);
   return layout;
 }
 
@@ -106,10 +107,6 @@ export function encodeQCCode(envelope: Uint8Array, options: EncodeOptions = {}):
   const requested = options.layout ?? options.version ?? "auto";
   if (!bearer && requested === "S1") throw new Error("S1 requires a bearer envelope; signed envelopes require C1, C2 or C3");
   const layout = bearer && requested === "auto" ? LAYOUTS.S1 : selectLayout(envelope.length, requested);
-  if (layout.visualVersion === 1 && !warnedDeprecatedLayout) {
-    warnedDeprecatedLayout = true;
-    console.warn("[QCCode] C1/C2/C3 formats are deprecated as of v0.3.5 and will be removed in a future release. Migrate to S1 using server-issued bearer envelopes and online redemption; S1 does not support signed envelopes or offline verification.");
-  }
   let best: { mask: number; rings: Uint8Array[]; penalty: number } | undefined;
   for (let mask = 0; mask < 8; mask++) {
     const frame = createVisualFrame(envelope, layout, mask);

@@ -27,19 +27,28 @@ describe("SDK format deprecation", () => {
     expect(console.warn).not.toHaveBeenCalled();
   });
 
-  it.each(["C1", "C2", "C3"] as const)("warns once per module while preserving %s bearer round trips", async (layout) => {
+  it.each(["C1", "C2", "C3"] as const)("warns once for %s while preserving bearer round trips", async (layout) => {
     const sdk = await import("../packages/sdk/src/index.js");
     const symbol = sdk.encodeQCCode(bearer, { version: layout });
     expect(symbol.layout.id).toBe(layout);
-    expect(console.warn).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/C1\/C2\/C3.*deprecated.*v0\.3\.5.*removed in a future release.*Migrate to S1/));
+    expect(console.warn).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(new RegExp(`${layout}.*deprecated.*v0\\.3\\.5.*removed in a future release.*Migrate to S1`)));
     sdk.encodeQCCode(bearer, { layout });
     expect(console.warn).toHaveBeenCalledTimes(1);
-    vi.mocked(console.warn).mockClear();
-
     expect(sdk.decodeSampledSymbol(symbol, []).envelopeBytes).toEqual(bearer);
-    expect(console.warn).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/C1\/C2\/C3.*deprecated.*removed in a future release.*Migrate to S1/));
     expect(sdk.decodeIdealSymbol(symbol).envelopeBytes).toEqual(bearer);
     expect(console.warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("warns once for each deprecated layout used in the same runtime", async () => {
+    const sdk = await import("../packages/sdk/src/index.js");
+    sdk.encodeQCCode(bearer, { layout: "C1" });
+    sdk.encodeQCCode(bearer, { layout: "C2" });
+    sdk.encodeQCCode(bearer, { layout: "C1" });
+    expect(console.warn).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(console.warn).mock.calls.map(([message]) => message)).toEqual([
+      expect.stringMatching(/C1.*deprecated/),
+      expect.stringMatching(/C2.*deprecated/),
+    ]);
   });
 
   it.each([[32, "C1"], [50, "C2"], [300, "C3"]] as const)("warns when auto selects %s-byte signed payload layout %s", async (payloadLength, layout) => {
@@ -54,7 +63,7 @@ describe("SDK format deprecation", () => {
     expect(symbol.layout.id).toBe(layout);
     expect(console.warn).toHaveBeenCalledTimes(1);
     expect(sdk.decodeIdealSymbol(symbol).envelopeBytes).toEqual(envelope);
-    expect(console.warn).toHaveBeenCalledTimes(2);
+    expect(console.warn).toHaveBeenCalledTimes(1);
     expect(() => sdk.encodeQCCode(envelope, { layout: "S1" })).toThrow("S1 requires a bearer envelope");
   });
 
@@ -62,9 +71,8 @@ describe("SDK format deprecation", () => {
     const sdk = await import("../packages/sdk/src/index.js");
     expect(() => sdk.encodeQCCode(new Uint8Array(), { layout: "C1" })).toThrow();
     const symbol = sdk.encodeQCCode(bearer, { layout: "C1" });
-    vi.mocked(console.warn).mockClear();
     expect(() => sdk.decodeSampledSymbol({ ...symbol, dataRings: [] }, [])).toThrow();
-    expect(console.warn).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledTimes(1);
     sdk.decodeIdealSymbol(symbol);
     expect(console.warn).toHaveBeenCalledTimes(1);
   });
